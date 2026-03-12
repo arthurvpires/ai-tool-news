@@ -1,8 +1,8 @@
-# AI News Scout Bot 🤖🍿
+# AI News Scout Bot 🤖
 
 An automated AI news aggregator that monitors top AI companies on Twitter/X, filters them using AI (Groq/OpenAI), and publishes the most relevant technical updates to a Telegram channel—including native video player support!
 
-## ✨ Features
+## Features
 - **Twitter Tracking**: Monitors accounts like OpenAI, Claude, Google, and Perplexity via Nitter RSS (robust instance pool).
 - **AI-Powered Filtering**: Uses a strict "Scout" prompt with Groq (Llama-3.1) or OpenAI to filter out marketing noise and only keep real technical/product updates.
 - **Native Video Support**: High-quality video downloads using `yt-dlp` to ensure a real video player experience on Telegram.
@@ -10,7 +10,7 @@ An automated AI news aggregator that monitors top AI companies on Twitter/X, fil
 - **Auto-Scheduler**: Runs periodically (default: 5 min) using `APScheduler`.
 - **Duplicate Prevention**: Uses a local SQLite database to ensure the same news is never posted twice.
 
-## 🚀 Getting Started
+## Getting Started
 
 ### 1. Prerequisites
 - Python 3.10+
@@ -50,12 +50,10 @@ ruff check .
 ruff format .
 ```
 
-## 🛠 Project Structure
+## Project Structure
 - `app/collectors`: RSS fetching logic.
 - `app/analyzer`: GPT/Groq analysis engine.
 - `app/telegram`: Messaging and video download management.
 - `app/prompts.yaml`: The "personality" and filtering rules of the bot.
 - `newsletter.db`: SQLite database for processed IDs.
 
-## 📄 License
-MIT
