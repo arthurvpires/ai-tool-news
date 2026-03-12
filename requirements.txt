@@ -1,0 +1,15 @@
+fastapi
+uvicorn
+requests
+apscheduler
+python-telegram-bot
+pydantic-settings
+openai
+python-dotenv
+sqlalchemy
+bs4
+feedparser
+groq
+yt-dlp
+PyYAML
+ruff
