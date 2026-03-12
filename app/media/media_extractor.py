@@ -1,7 +1,8 @@
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any
 import logging
 
 logger = logging.getLogger(__name__)
+
 
 class MediaExtractor:
     def __init__(self):
@@ -11,7 +12,7 @@ class MediaExtractor:
         """
         Parses a raw document fetched from the collectors and returns a canonical format
         expected by the analyzer and telegram dispatcher.
-        
+
         Input doc example:
         {
             "source": "twitter",
@@ -31,7 +32,7 @@ class MediaExtractor:
                 "text": doc.get("text", doc.get("title", "")),
                 "images": doc.get("images", []),
                 "video": doc.get("video"),
-                "url": doc.get("url")
+                "url": doc.get("url"),
             }
         except Exception as e:
             logger.error(f"Failed to extract media for document: {e}")
@@ -42,5 +43,5 @@ class MediaExtractor:
                 "text": "error",
                 "images": [],
                 "video": None,
-                "url": ""
+                "url": "",
             }

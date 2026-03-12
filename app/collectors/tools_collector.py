@@ -1,6 +1,5 @@
 from typing import List, Dict, Any
 import requests
-from bs4 import BeautifulSoup
 import logging
 
 logger = logging.getLogger(__name__)
@@ -8,15 +7,10 @@ logger = logging.getLogger(__name__)
 # Simple scraper for release notes or changelogs
 # In a real-world scenario, you might use specific APIs for each tool (like GitHub Releases API)
 TOOLS_TO_MONITOR = [
-    {
-        "name": "LangChain",
-        "repo": "langchain-ai/langchain"
-    },
-    {
-        "name": "Ollama",
-        "repo": "ollama/ollama"
-    }
+    {"name": "LangChain", "repo": "langchain-ai/langchain"},
+    {"name": "Ollama", "repo": "ollama/ollama"},
 ]
+
 
 class ToolsCollector:
     def __init__(self):
@@ -34,18 +28,20 @@ class ToolsCollector:
                     body = data.get("body", "")
                     html_url = data.get("html_url", "")
                     release_id = data.get("id")
-                    
-                    collected.append({
-                        "source": "github_releases",
-                        "company": tool["name"],
-                        "title": f"{tool['name']} Release: {release_name}",
-                        "text": f"New version of {tool['name']}: {release_name}\n\n{body[:500]}...", # truncate body
-                        "images": [],
-                        "video": None,
-                        "url": html_url,
-                        "id": f"tool_release_{tool['name']}_{release_id}"
-                    })
+
+                    collected.append(
+                        {
+                            "source": "github_releases",
+                            "company": tool["name"],
+                            "title": f"{tool['name']} Release: {release_name}",
+                            "text": f"New version of {tool['name']}: {release_name}\n\n{body[:500]}...",  # truncate body
+                            "images": [],
+                            "video": None,
+                            "url": html_url,
+                            "id": f"tool_release_{tool['name']}_{release_id}",
+                        }
+                    )
             except Exception as e:
                 logger.error(f"Error fetching tool updates for {tool['name']}: {e}")
-                
+
         return collected
