@@ -25,7 +25,7 @@ COMPANIES = {
     "@Google": "Google",
     "@GoogleAI": "GoogleAI",
     "@GeminiApp": "GeminiApp",
-    "@MetaAI": "MetaAI",
+    "@AIatMeta": "AIatMeta",
     "@xai": "xai",
     "@ManusAI": "ManusAI",
 
@@ -45,9 +45,9 @@ COMPANIES = {
     "@morganlinton": "morganlinton",
 
     # AI News & Research
-    "@_aibreakfast": "_aibreakfast",
+    "@AiBreakFast": "AiBreakFast",
     "@therundownai": "therundownai",
-    "@aiedge_": "aiedge",
+    "@aiedge_": "aiedge_",
 }
 
 class TwitterCollector:
@@ -60,6 +60,9 @@ class TwitterCollector:
     def _fetch_from_rss(self) -> List[Dict[str, Any]]:
         collected = []
         now = datetime.now(timezone.utc)
+        total_accounts = len(COMPANIES)
+        fetched_accounts = 0
+        failed_list = []
 
         for handle, username in COMPANIES.items():
             success = False
@@ -184,13 +187,17 @@ class TwitterCollector:
                         )
 
                     success = True
-                    break  # Success with this instance, move to next handle
+                    fetched_accounts += 1
+                    break
 
                 except Exception as e:
                     logger.debug(f"Failed to fetch {handle} from {instance}: {e}")
 
             if not success:
-                logger.debug(f"All Nitter instances failed for {handle}")
+                failed_list.append(handle)
+
+        if failed_list:
+            logger.warning(f"Failed to fetch {len(failed_list)}/{total_accounts} accounts: {', '.join(failed_list)}")
 
         return collected
 
