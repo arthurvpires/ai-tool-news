@@ -29,7 +29,6 @@ COMPANIES = {
     "@xai": "xai",
     "@ManusAI": "ManusAI",
 
-
     # AI Products & Tools
     "@perplexity_ai": "perplexity_ai",
     "@midjourney": "midjourney",
@@ -39,17 +38,17 @@ COMPANIES = {
 
     # Key People
     "@sama": "sama",
-    "@karpathy": "karpathy",
-    "@ylecun": "ylecun",
-    "@demishassabis": "demishassabis",
-    "@JeffDean": "JeffDean",
+    "@bentossell": "bentossell",
+    "@mreflow": "mreflow",
+    "@bilawalsidhu": "bilawalsidhu",
+  
+    "@morganlinton": "morganlinton",
 
     # AI News & Research
     "@_aibreakfast": "_aibreakfast",
-    "@TheAIGRID": "TheAIGRID",
-    "@ai__pub": "ai__pub",
+    "@therundownai": "therundownai",
+    "@aiedge_": "aiedge",
 }
-
 
 class TwitterCollector:
     def __init__(self):

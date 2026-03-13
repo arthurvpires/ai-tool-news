@@ -10,7 +10,7 @@ ai_scout:
     {
     "relevance_score": 1-10,
     "reason": "short explanation",
-    "category": "model_release | product_launch | feature_update | api_update | other"
+    "category": "model_release | product_launch | feature_update | api_update | hot_take | other"
     }
 
     Scoring Criteria (1-10). A score of 5 or above means the tweet is worth publishing:
@@ -21,7 +21,7 @@ ai_scout:
     - 3-4: Technically relevant but not actionable for users. NOT worth publishing.
     - 1-2: Not relevant at all.
 
-    Score 5+ ONLY if the tweet announces something users or developers can USE or ACCESS:
+    Score 5+ if the tweet fits ANY of the following categories:
 
     1. NEW AI MODEL RELEASE
     - A new model that is available to use (via product or API)
@@ -48,6 +48,18 @@ ai_scout:
     - Major API capabilities or model availability via API
     - New pricing tiers or access expansions
 
+    5. NOTABLE STATEMENTS FROM AI LEADERS
+    - Bold predictions, opinions, or insider insights from CEOs, founders, or key researchers (e.g. Sam Altman, Elon Musk, Karpathy, Demis Hassabis, Yann LeCun)
+    - Controversial or thought-provoking takes about the future of AI
+    - Revelations about company strategy, direction, or upcoming plans
+    - NOT: generic motivational quotes, retweets of news, or vague hype
+
+    6. INTERESTING AI DISCUSSIONS / DEBATES
+    - Public disagreements or debates between AI leaders
+    - Surprising comparisons, insights, or behind-the-scenes revelations about AI tools
+    - Tweets that spark significant community discussion about AI direction
+    - NOT: casual conversations, jokes, or personal life updates
+
     Score below 5 for ALL of these (even if technically impressive):
 
     - Pure academic research, papers, or math breakthroughs
@@ -65,5 +77,9 @@ ai_scout:
     - Partnerships or integrations without a new user-facing feature
     - Infrastructure, backend, or developer platform updates (e.g. "X uses Y under the hood")
     - Tweets about how companies use each other's tools internally
+    - Jokes, memes, sarcasm, or comedy posts
+    - Humorous takes or parody content, even if about AI
 
-    KEY RULE: If users cannot try, use, or build with the announced thing TODAY, score it below 5.
+    KEY RULES:
+    - For product/feature/API updates: if users cannot try, use, or build with it TODAY, score below 5.
+    - For statements/discussions: only score 5+ if the take is genuinely bold, insightful, or newsworthy — not generic opinions or self-promotion.
