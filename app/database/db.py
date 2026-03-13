@@ -1,67 +1,77 @@
-from sqlalchemy import create_engine, Column, String, DateTime, Boolean, Text, Integer
-from sqlalchemy.orm import declarative_base, sessionmaker
 from datetime import datetime
+from supabase import create_client
 from app.config import settings
 import logging
 import json
 
 logger = logging.getLogger(__name__)
 
-engine = create_engine(settings.DATABASE_URL, connect_args={"check_same_thread": False})
-SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+TABLE = "processed_content"
 
-Base = declarative_base()
-
-
-class ProcessedContent(Base):
-    __tablename__ = "processed_content"
-
-    content_id = Column(String, primary_key=True, index=True)
-    source = Column(String, index=True)
-    timestamp = Column(DateTime, default=datetime.utcnow)
-    sent_at = Column(DateTime, default=None)
-
-    # Metadata for pending items
-    is_relevant = Column(Boolean, default=False)
-    relevance_score = Column(Integer, default=0)
-    text = Column(Text, nullable=True)
-    company = Column(String, nullable=True)
-    url = Column(String, nullable=True)
-    images_json = Column(Text, nullable=True)  # JSON string of images list
-    video = Column(String, nullable=True)
-    analysis_summary = Column(Text, nullable=True)
-    analysis_category = Column(String, nullable=True)
+supabase = create_client(settings.SUPABASE_URL, settings.SUPABASE_SERVICE_KEY)
 
 
-def init_db():
-    Base.metadata.create_all(bind=engine)
-    logger.info("Database initialized.")
+def is_content_processed(content_id):
+    result = (
+        supabase.table(TABLE)
+        .select("content_id")
+        .eq("content_id", content_id)
+        .execute()
+    )
+    return len(result.data) > 0
 
 
-def is_content_processed(content_id: str) -> bool:
-    with SessionLocal() as session:
-        exists = session.query(ProcessedContent).filter(ProcessedContent.content_id == content_id).first()
-        return exists is not None
+def mark_content_processed(content_id, source, metadata=None):
+    if is_content_processed(content_id):
+        return
+
+    row = {
+        "content_id": content_id,
+        "source": source,
+    }
+
+    if metadata:
+        sent_at = metadata.pop("sent_at", None)
+        if sent_at:
+            row["sent_at"] = sent_at.isoformat() if isinstance(sent_at, datetime) else sent_at
+
+        row["is_relevant"] = metadata.get("relevant", False)
+        row["relevance_score"] = metadata.get("relevance_score", 0)
+        row["text"] = metadata.get("text")
+        row["company"] = metadata.get("company")
+        row["url"] = metadata.get("url")
+        if metadata.get("images"):
+            row["images_json"] = json.dumps(metadata.get("images"))
+        row["video"] = metadata.get("video")
+        row["analysis_summary"] = metadata.get("summary")
+        row["analysis_category"] = metadata.get("category")
+
+    supabase.table(TABLE).insert(row).execute()
 
 
-def mark_content_processed(content_id: str, source: str, metadata: dict = None):
-    with SessionLocal() as session:
-        if not is_content_processed(content_id):
-            sent_at = metadata.pop("sent_at", None) if metadata else None
+def get_pending_items():
+    result = (
+        supabase.table(TABLE)
+        .select("*")
+        .eq("is_relevant", True)
+        .is_("sent_at", "null")
+        .order("relevance_score", desc=True)
+        .order("timestamp", desc=True)
+        .execute()
+    )
+    return result.data
 
-            db_item = ProcessedContent(content_id=content_id, source=source, sent_at=sent_at)
 
-            if metadata:
-                db_item.is_relevant = metadata.get("relevant", False)
-                db_item.relevance_score = metadata.get("relevance_score", 0)
-                db_item.text = metadata.get("text")
-                db_item.company = metadata.get("company")
-                db_item.url = metadata.get("url")
-                if metadata.get("images"):
-                    db_item.images_json = json.dumps(metadata.get("images"))
-                db_item.video = metadata.get("video")
-                db_item.analysis_summary = metadata.get("summary")
-                db_item.analysis_category = metadata.get("category")
+def mark_item_sent(content_id):
+    supabase.table(TABLE).update(
+        {"sent_at": datetime.utcnow().isoformat()}
+    ).eq("content_id", content_id).execute()
 
-            session.add(db_item)
-            session.commit()
+
+def get_total_count():
+    result = (
+        supabase.table(TABLE)
+        .select("content_id", count="exact")
+        .execute()
+    )
+    return result.count or 0

@@ -1,6 +1,5 @@
 import logging
 import json
-from datetime import datetime
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.collectors.twitter_collector import TwitterCollector
@@ -68,50 +67,40 @@ async def send_pending_to_telegram_job():
     """Job 2: Send the single most relevant pending item to Telegram."""
     telegram_sender = TelegramSender()
 
-    with db.SessionLocal() as session:
-        # Get all currently pending relevant items
-        pending_items = (
-            session.query(db.ProcessedContent)
-            .filter(db.ProcessedContent.is_relevant == True, db.ProcessedContent.sent_at == None)
-            .order_by(db.ProcessedContent.relevance_score.desc(), db.ProcessedContent.timestamp.desc())
-            .all()
-        )
+    pending_items = db.get_pending_items()
 
-        if not pending_items:
-            return
+    if not pending_items:
+        return
 
-        # Pick only the most relevant one
-        top_item = pending_items[0]
+    top_item = pending_items[0]
 
-        logger.info(
-            f"Picking most relevant out of {len(pending_items)} items: {top_item.content_id} (Score: {top_item.relevance_score})"
-        )
+    logger.info(
+        f"Picking most relevant out of {len(pending_items)} items: {top_item['content_id']} (Score: {top_item['relevance_score']})"
+    )
 
-        try:
-            # Reconstruct content and analysis dicts for TelegramSender
-            content = {
-                "id": top_item.content_id,
-                "source": top_item.source,
-                "text": top_item.text,
-                "company": top_item.company,
-                "url": top_item.url,
-                "images": json.loads(top_item.images_json) if top_item.images_json else [],
-                "video": top_item.video,
-            }
-            analysis = {"relevant": True, "summary": top_item.analysis_summary, "category": top_item.analysis_category}
+    try:
+        content = {
+            "id": top_item["content_id"],
+            "source": top_item["source"],
+            "text": top_item["text"],
+            "company": top_item["company"],
+            "url": top_item["url"],
+            "images": json.loads(top_item["images_json"]) if top_item.get("images_json") else [],
+            "video": top_item["video"],
+        }
+        analysis = {
+            "relevant": True,
+            "summary": top_item["analysis_summary"],
+            "category": top_item["analysis_category"],
+        }
 
-            await telegram_sender.send_update(content, analysis)
+        await telegram_sender.send_update(content, analysis)
 
-            # Mark ONLY the top one as sent.
-            # The others will stay in the DB and be picked up in the next cycle (1 minute later),
-            # effectively sending "only one at a time" as requested.
-            top_item.sent_at = datetime.utcnow()
-            session.commit()
-            logger.info(f"Successfully sent top news: {top_item.content_id}")
+        db.mark_item_sent(top_item["content_id"])
+        logger.info(f"Successfully sent top news: {top_item['content_id']}")
 
-        except Exception as e:
-            logger.error(f"Failed to send top pending item {top_item.content_id}: {e}")
-            session.rollback()
+    except Exception as e:
+        logger.error(f"Failed to send top pending item {top_item['content_id']}: {e}")
 
 
 def setup_scheduler() -> AsyncIOScheduler:

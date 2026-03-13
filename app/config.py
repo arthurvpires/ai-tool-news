@@ -11,10 +11,13 @@ class Settings(BaseSettings):
     OPENAI_API_KEY: str = "your_openai_api_key"
     GROQ_API_KEY: str = "your_groq_api_key"
 
+    # Supabase
+    SUPABASE_URL: str = "https://your-project.supabase.co"
+    SUPABASE_SERVICE_KEY: str = "your_service_role_key"
+
     # App Config
     SCHEDULER_SEARCHING_TWEETS_MINUTES: int = Field(default=5)
     SCHEDULER_TELEGRAM_SENDING_MINUTES: int = Field(default=1)
-    DATABASE_URL: str = Field(default="sqlite:///./ai_database.db")
 
     class Config:
         env_file = ".env"

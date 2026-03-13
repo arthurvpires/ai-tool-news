@@ -6,7 +6,7 @@ python-telegram-bot
 pydantic-settings
 openai
 python-dotenv
-sqlalchemy
+supabase
 bs4
 feedparser
 groq

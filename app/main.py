@@ -1,11 +1,13 @@
 import logging
+import os
 from fastapi import FastAPI, BackgroundTasks
 from contextlib import asynccontextmanager
 
-from app.database.db import init_db
+from app.database import db
 from app.scheduler.jobs import setup_scheduler, fetch_and_analyze_job
 
-# Configure standard logging format
+os.makedirs("logs", exist_ok=True)
+
 logging.basicConfig(
     level=logging.INFO,
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
@@ -19,7 +21,6 @@ scheduler = setup_scheduler()
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Setup on startup
-    init_db()
     scheduler.start()
     logger.info("Scheduler started.")
 
@@ -55,8 +56,5 @@ async def manual_run_collector(background_tasks: BackgroundTasks):
 @app.get("/stats")
 def get_stats():
     """Return some basic system stats."""
-    from app.database.db import SessionLocal, ProcessedContent
-
-    with SessionLocal() as session:
-        total_processed = session.query(ProcessedContent).count()
-        return {"total_processed": total_processed}
+    total_processed = db.get_total_count()
+    return {"total_processed": total_processed}
