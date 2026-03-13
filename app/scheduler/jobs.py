@@ -4,7 +4,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.collectors.twitter_collector import TwitterCollector
 from app.media.media_extractor import MediaExtractor
-from app.analyzer.gpt_analyzer import GPTAnalyzer
+from app.analyzer.ai_analyzer import AIAnalyzer
 from app.telegram.telegram_sender import TelegramSender
 from app.database import db
 from app.config import settings
@@ -18,7 +18,7 @@ async def fetch_and_analyze_job():
 
     collectors = [TwitterCollector()]
     media_extractor = MediaExtractor()
-    analyzer = GPTAnalyzer()
+    analyzer = AIAnalyzer()
 
     all_content = []
 

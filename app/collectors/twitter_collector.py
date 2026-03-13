@@ -18,13 +18,34 @@ NITTER_INSTANCES = [
 ]
 
 COMPANIES = {
+    # Major AI Labs
     "@OpenAI": "OpenAI",
     "@AnthropicAI": "AnthropicAI",
     "@ClaudeAI": "ClaudeAI",
-    "@perplexity_ai": "perplexity_ai",
     "@Google": "Google",
+    "@GoogleAI": "GoogleAI",
     "@GeminiApp": "GeminiApp",
+    "@MetaAI": "MetaAI",
+    "@xai": "xai",
+
+    # AI Products & Tools
+    "@perplexity_ai": "perplexity_ai",
+    "@midjourney": "midjourney",
+    "@cursor_ai": "cursor_ai",
+    "@vercel": "vercel",
+    "@openclaw": "openclaw",
+
+    # Key People
     "@sama": "sama",
+    "@karpathy": "karpathy",
+    "@ylecun": "ylecun",
+    "@demishassabis": "demishassabis",
+    "@JeffDean": "JeffDean",
+
+    # AI News & Research
+    "@_aibreakfast": "_aibreakfast",
+    "@TheAIGRID": "TheAIGRID",
+    "@ai__pub": "ai__pub",
 }
 
 
