@@ -16,8 +16,10 @@ GROQ_MODELS = [
 ]
 
 
+MIN_RELEVANT_SCORE = 5
+
+
 class AIAnalysisResult(BaseModel):
-    relevant: bool = Field(description="True if the content is an important AI update, False otherwise.")
     relevance_score: int = Field(description="A score from 1 to 10 on the importance of the update.")
     reason: str = Field(description="A short explanation of why it is relevant or not.")
     category: str = Field(description="The category of the update.")
@@ -87,11 +89,12 @@ class AIAnalyzer:
             max_tokens=300,
         )
         result = response.choices[0].message.parsed
+        relevant = result.relevance_score >= MIN_RELEVANT_SCORE
         logger.info(
-            f"Analysis result for {content_id}: Relevant={result.relevant} (Score={result.relevance_score}) | {result.reason}"
+            f"Analysis result for {content_id}: Relevant={relevant} (Score={result.relevance_score}) | {result.reason}"
         )
         return {
-            "relevant": result.relevant,
+            "relevant": relevant,
             "relevance_score": result.relevance_score,
             "summary": result.reason,
             "category": result.category,
@@ -116,7 +119,7 @@ class AIAnalyzer:
                 {
                     "role": "system",
                     "content": self.system_prompt
-                    + "\n\nReturn EXACTLY a valid JSON object with the keys: 'relevant' (boolean), 'relevance_score' (int), 'reason' (string), and 'category' (string).",
+                    + "\n\nReturn EXACTLY a valid JSON object with the keys: 'relevance_score' (int), 'reason' (string), and 'category' (string).",
                 },
                 {"role": "user", "content": f"Please analyze the following content:\n\n{text}"},
             ],
@@ -124,9 +127,9 @@ class AIAnalyzer:
             max_tokens=300,
         )
         result_json = json.loads(response.choices[0].message.content)
-        relevant = bool(result_json.get("relevant"))
+        score = int(result_json.get("relevance_score", 0))
+        relevant = score >= MIN_RELEVANT_SCORE
         reason = str(result_json.get("reason", result_json.get("summary", "")))
-        score = int(result_json.get("relevance_score", 5 if relevant else 0))
 
         logger.info(f"Analysis result for {content_id}: Relevant={relevant} (Score={score}) | Reason: {reason}")
         return {
