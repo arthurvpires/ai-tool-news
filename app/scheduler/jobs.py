@@ -47,12 +47,11 @@ async def fetch_and_analyze_job():
         analysis_result = analyzer.analyze(canonical_content)
         analyzed += 1
 
-        if not analysis_result.get("relevant"):
-            continue
-
-        relevant += 1
         metadata = {**canonical_content, **analysis_result}
         db.mark_content_processed(content_id, source, metadata=metadata)
+
+        if analysis_result.get("relevant"):
+            relevant += 1
 
     logger.info(
         f"--- Cycle done | Collected: {len(all_content)} | Skipped: {skipped} | Analyzed: {analyzed} | Relevant: {relevant} ---"
