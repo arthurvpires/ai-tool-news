@@ -118,6 +118,7 @@ def setup_scheduler() -> AsyncIOScheduler:
         minutes=settings.SCHEDULER_TELEGRAM_SENDING_MINUTES,
         id="send_to_telegram_job",
         replace_existing=True,
+        misfire_grace_time=120,
     )
 
     return scheduler
