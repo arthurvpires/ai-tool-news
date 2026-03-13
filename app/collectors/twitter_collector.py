@@ -27,6 +27,8 @@ COMPANIES = {
     "@GeminiApp": "GeminiApp",
     "@MetaAI": "MetaAI",
     "@xai": "xai",
+    "@ManusAI": "ManusAI",
+    
 
     # AI Products & Tools
     "@perplexity_ai": "perplexity_ai",
