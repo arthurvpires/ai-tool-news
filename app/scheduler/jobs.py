@@ -1,5 +1,6 @@
 import logging
 import json
+import asyncio
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.collectors.twitter_collector import TwitterCollector
@@ -46,6 +47,7 @@ async def fetch_and_analyze_job():
         canonical_content = media_extractor.extract_media(item)
         analysis_result = analyzer.analyze(canonical_content)
         analyzed += 1
+        await asyncio.sleep(2)
 
         metadata = {**canonical_content, **analysis_result}
         db.mark_content_processed(content_id, source, metadata=metadata)
