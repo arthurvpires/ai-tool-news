@@ -46,8 +46,9 @@ root_logger.setLevel(logging.INFO)
 root_logger.addHandler(file_handler)
 root_logger.addHandler(console_handler)
 
-for noisy in ["httpx", "apscheduler", "httpcore", "hpack"]:
+for noisy in ["httpx", "httpcore", "hpack"]:
     logging.getLogger(noisy).setLevel(logging.WARNING)
+logging.getLogger("apscheduler").setLevel(logging.ERROR)
 
 for uv_name in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
     uv_logger = logging.getLogger(uv_name)
