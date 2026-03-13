@@ -28,7 +28,7 @@ COMPANIES = {
     "@MetaAI": "MetaAI",
     "@xai": "xai",
     "@ManusAI": "ManusAI",
-    
+
 
     # AI Products & Tools
     "@perplexity_ai": "perplexity_ai",
@@ -67,14 +67,10 @@ class TwitterCollector:
             for instance in NITTER_INSTANCES:
                 rss_url = f"{instance}/{username}/rss"
                 try:
-                    logger.info(f"Fetching tweets for {handle} from {rss_url}...")
                     feed = feedparser.parse(rss_url)
 
                     if not feed.entries:
-                        logger.warning(f"No entries for {handle} at {instance}")
                         continue
-
-                    logger.info(f"Processing {len(feed.entries)} entries for {handle}")
                     for entry in feed.entries[:10]:  # Check more entries to find recent ones
                         # Filter out retweets and replies
                         if entry.title.startswith("RT by") or "RT @" in entry.title:
@@ -173,7 +169,6 @@ class TwitterCollector:
 
                         if video_detected:
                             text = re.sub(r"\s+Video$", "", text, flags=re.IGNORECASE).strip()
-                            logger.info(f"VIDEO FLAG set for tweet {tweet_id}")
 
                         collected.append(
                             {
@@ -193,10 +188,10 @@ class TwitterCollector:
                     break  # Success with this instance, move to next handle
 
                 except Exception as e:
-                    logger.error(f"Failed to fetch {handle} from {instance}: {e}")
+                    logger.debug(f"Failed to fetch {handle} from {instance}: {e}")
 
             if not success:
-                logger.error(f"All instances failed for {handle}")
+                logger.debug(f"All Nitter instances failed for {handle}")
 
         return collected
 

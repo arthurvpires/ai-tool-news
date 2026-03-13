@@ -14,23 +14,23 @@ logger = logging.getLogger(__name__)
 
 async def fetch_and_analyze_job():
     """Job 1: Fetch content from collectors and perform AI analysis."""
-    logger.info("Starting collection and analysis job...")
+    logger.info("--- Collection cycle started ---")
 
     collectors = [TwitterCollector()]
     media_extractor = MediaExtractor()
     analyzer = AIAnalyzer()
 
     all_content = []
-
-    # 1. Fetch content from all collectors
     for collector in collectors:
         try:
             if hasattr(collector, "fetch_latest_tweets"):
                 all_content.extend(collector.fetch_latest_tweets())
         except Exception as e:
-            logger.error(f"Error running collector {collector.__class__.__name__}: {e}")
+            logger.error(f"Collector {collector.__class__.__name__} failed: {e}")
 
-    logger.info(f"Collected total of {len(all_content)} items.")
+    skipped = 0
+    analyzed = 0
+    relevant = 0
 
     for item in all_content:
         content_id = item.get("id")
@@ -39,28 +39,24 @@ async def fetch_and_analyze_job():
         if not content_id:
             continue
 
-        # 2. Anti Duplication System
         if db.is_content_processed(content_id):
+            skipped += 1
             continue
 
-        # 3. Media Extraction
         canonical_content = media_extractor.extract_media(item)
-
-        # 4. AI Analysis
         analysis_result = analyzer.analyze(canonical_content)
+        analyzed += 1
 
-        # Merge all into metadata for saving
+        if not analysis_result.get("relevant"):
+            continue
+
+        relevant += 1
         metadata = {**canonical_content, **analysis_result}
-
-        # 5. Save to DB with relevance flag
         db.mark_content_processed(content_id, source, metadata=metadata)
 
-        if analysis_result.get("relevant"):
-            logger.info(f"Found relevant content: {content_id}. Queued for sending.")
-        else:
-            logger.debug(f"Content {content_id} filtered out by AI.")
-
-    logger.info("Collection and analysis job finished.")
+    logger.info(
+        f"--- Cycle done | Collected: {len(all_content)} | Skipped: {skipped} | Analyzed: {analyzed} | Relevant: {relevant} ---"
+    )
 
 
 async def send_pending_to_telegram_job():
@@ -75,7 +71,7 @@ async def send_pending_to_telegram_job():
     top_item = pending_items[0]
 
     logger.info(
-        f"Picking most relevant out of {len(pending_items)} items: {top_item['content_id']} (Score: {top_item['relevance_score']})"
+        f"Sending to Telegram ({len(pending_items)} pending) | {top_item['company']} | Score: {top_item['relevance_score']} | {top_item['content_id']}"
     )
 
     try:
@@ -97,10 +93,10 @@ async def send_pending_to_telegram_job():
         await telegram_sender.send_update(content, analysis)
 
         db.mark_item_sent(top_item["content_id"])
-        logger.info(f"Successfully sent top news: {top_item['content_id']}")
+        logger.info(f"Sent OK: {top_item['content_id']}")
 
     except Exception as e:
-        logger.error(f"Failed to send top pending item {top_item['content_id']}: {e}")
+        logger.error(f"Send FAILED: {top_item['content_id']} | {e}")
 
 
 def setup_scheduler() -> AsyncIOScheduler:

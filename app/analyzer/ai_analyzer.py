@@ -56,26 +56,21 @@ class AIAnalyzer:
         text = content.get("text", "")
         content_id = content.get("id", "unknown")
 
-        logger.info(f"Analyzing content {content_id} (Length: {len(text)})")
-
         if not text:
-            logger.warning(f"No text content to analyze for {content_id}")
             return {"relevant": False, "summary": "No text content", "relevance_score": 0}
 
         if self.openai_client:
             try:
-                logger.info(f"Dispatching request to OpenAI (gpt-4o-mini) for {content_id}")
                 return self._call_openai(text, content_id)
             except Exception as e:
-                logger.error(f"OpenAI failed for {content_id}: {e}")
+                logger.warning(f"OpenAI failed for {content_id}: {e}")
                 if not self.groq_client:
                     return {"relevant": False, "summary": "Analysis failed", "relevance_score": 0}
-                logger.warning(f"Falling back to Groq for {content_id}...")
+                logger.warning(f"Falling back to Groq...")
 
         if self.groq_client:
             return self._call_groq_with_fallback(text, content_id)
 
-        logger.info(f"Using mocked analysis for {content_id}")
         return self._mock_analyze(text)
 
     def _call_openai(self, text, content_id):
@@ -90,9 +85,8 @@ class AIAnalyzer:
         )
         result = response.choices[0].message.parsed
         relevant = result.relevance_score >= MIN_RELEVANT_SCORE
-        logger.info(
-            f"Analysis result for {content_id}: Relevant={relevant} (Score={result.relevance_score}) | {result.reason}"
-        )
+        mark = ">>>" if relevant else "   "
+        logger.info(f"{mark} [{result.relevance_score:>2}/10] {content_id} | {result.reason}")
         return {
             "relevant": relevant,
             "relevance_score": result.relevance_score,
@@ -103,14 +97,13 @@ class AIAnalyzer:
     def _call_groq_with_fallback(self, text, content_id):
         for i, model in enumerate(GROQ_MODELS):
             try:
-                logger.info(f"Dispatching request to Groq ({model}) for {content_id}")
                 return self._call_groq(model, text, content_id)
             except Exception as e:
                 is_last = i == len(GROQ_MODELS) - 1
                 if is_last:
-                    logger.error(f"All Groq models failed for {content_id}. Last error ({model}): {e}")
+                    logger.error(f"All Groq models failed for {content_id}: {e}")
                     return {"relevant": False, "summary": "Analysis failed", "relevance_score": 0}
-                logger.warning(f"Groq model {model} failed for {content_id}: {e}. Trying next model...")
+                logger.warning(f"Groq {model} failed, trying next model...")
 
     def _call_groq(self, model, text, content_id):
         response = self.groq_client.chat.completions.create(
@@ -131,7 +124,8 @@ class AIAnalyzer:
         relevant = score >= MIN_RELEVANT_SCORE
         reason = str(result_json.get("reason", result_json.get("summary", "")))
 
-        logger.info(f"Analysis result for {content_id}: Relevant={relevant} (Score={score}) | Reason: {reason}")
+        mark = ">>>" if relevant else "   "
+        logger.info(f"{mark} [{score:>2}/10] {content_id} | {reason}")
         return {
             "relevant": relevant,
             "relevance_score": score,

@@ -1,5 +1,6 @@
 import logging
 import os
+import sys
 from fastapi import FastAPI, BackgroundTasks
 from contextlib import asynccontextmanager
 
@@ -8,11 +9,53 @@ from app.scheduler.jobs import setup_scheduler, fetch_and_analyze_job
 
 os.makedirs("logs", exist_ok=True)
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
-    handlers=[logging.FileHandler("logs/app.log"), logging.StreamHandler()],
-)
+
+class ColorFormatter(logging.Formatter):
+    GREY = "\033[90m"
+    WHITE = "\033[37m"
+    GREEN = "\033[32m"
+    YELLOW = "\033[33m"
+    RED = "\033[31m"
+    BOLD_RED = "\033[1;31m"
+    CYAN = "\033[36m"
+    RESET = "\033[0m"
+
+    LEVEL_COLORS = {
+        logging.DEBUG: GREY,
+        logging.INFO: CYAN,
+        logging.WARNING: YELLOW,
+        logging.ERROR: RED,
+        logging.CRITICAL: BOLD_RED,
+    }
+
+    def format(self, record):
+        color = self.LEVEL_COLORS.get(record.levelno, self.WHITE)
+        timestamp = self.formatTime(record, "%H:%M:%S")
+        level = f"{record.levelname:<8}"
+        return f"{self.GREY}{timestamp}{self.RESET} {color}{level}{self.RESET} {record.getMessage()}"
+
+
+file_handler = logging.FileHandler("logs/app.log")
+file_handler.setFormatter(logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s"))
+
+console_handler = logging.StreamHandler(sys.stdout)
+console_handler.setFormatter(ColorFormatter())
+
+root_logger = logging.getLogger()
+root_logger.setLevel(logging.INFO)
+root_logger.addHandler(file_handler)
+root_logger.addHandler(console_handler)
+
+for noisy in ["httpx", "apscheduler", "httpcore", "hpack"]:
+    logging.getLogger(noisy).setLevel(logging.WARNING)
+
+for uv_name in ["uvicorn", "uvicorn.error", "uvicorn.access"]:
+    uv_logger = logging.getLogger(uv_name)
+    uv_logger.handlers.clear()
+    uv_logger.propagate = True
+    if uv_name == "uvicorn.access":
+        uv_logger.setLevel(logging.WARNING)
+
 logger = logging.getLogger(__name__)
 
 scheduler = setup_scheduler()
