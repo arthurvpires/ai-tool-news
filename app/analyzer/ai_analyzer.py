@@ -12,7 +12,7 @@ logger = logging.getLogger(__name__)
 
 GROQ_MODELS = [
     "llama-3.1-8b-instant",
-    "gemma2-9b-it",
+    "llama-3.3-70b-versatile",
 ]
 
 
