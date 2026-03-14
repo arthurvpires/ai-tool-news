@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 
 BRT = timezone(timedelta(hours=-3))
 SEND_HOUR_START = 8
-SEND_HOUR_END = 22
+SEND_HOUR_END = 21
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.collectors.twitter_collector import TwitterCollector
@@ -132,11 +132,13 @@ def setup_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
-    # Job 2: Send pending items to Telegram (8h–22h BRT only)
+    # Job 2: Send pending items to Telegram (8h, 11h, 14h, 17h, 20h BRT)
     scheduler.add_job(
         send_pending_to_telegram_job,
-        "interval",
-        minutes=settings.SCHEDULER_TELEGRAM_SENDING_MINUTES,
+        "cron",
+        hour="8,11,14,17,20",
+        minute=0,
+        timezone=BRT,
         id="send_to_telegram_job",
         replace_existing=True,
         misfire_grace_time=120,
