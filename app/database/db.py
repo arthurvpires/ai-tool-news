@@ -1,4 +1,4 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 from supabase import create_client
 from app.config import settings
 import logging
@@ -66,6 +66,19 @@ def mark_item_sent(content_id):
     supabase.table(TABLE).update(
         {"sent_at": datetime.utcnow().isoformat()}
     ).eq("content_id", content_id).execute()
+
+
+def delete_old_irrelevant_records(days: int = 2) -> int:
+    """Delete non-relevant records older than `days` days. Returns number of deleted rows."""
+    cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+    result = (
+        supabase.table(TABLE)
+        .delete()
+        .eq("is_relevant", False)
+        .lt("timestamp", cutoff)
+        .execute()
+    )
+    return len(result.data) if result.data else 0
 
 
 def get_total_count():

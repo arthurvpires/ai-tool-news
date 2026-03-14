@@ -1,6 +1,11 @@
 import logging
 import json
 import asyncio
+from datetime import datetime, timezone, timedelta
+
+BRT = timezone(timedelta(hours=-3))
+SEND_HOUR_START = 8
+SEND_HOUR_END = 22
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.collectors.twitter_collector import TwitterCollector
@@ -61,7 +66,12 @@ async def fetch_and_analyze_job():
 
 
 async def send_pending_to_telegram_job():
-    """Job 2: Send the single most relevant pending item to Telegram."""
+    """Job 2: Send the single most relevant pending item to Telegram (08h–22h BRT only)."""
+    now_brt = datetime.now(BRT)
+    if not (SEND_HOUR_START <= now_brt.hour < SEND_HOUR_END):
+        logger.debug(f"Outside send window ({now_brt.strftime('%H:%M')} BRT). Skipping.")
+        return
+
     telegram_sender = TelegramSender()
 
     pending_items = db.get_pending_items()
@@ -100,10 +110,20 @@ async def send_pending_to_telegram_job():
         logger.error(f"Send FAILED: {top_item['content_id']} | {e}")
 
 
+async def cleanup_old_records_job():
+    """Job 3: Delete non-relevant records older than 24h to keep the DB clean."""
+    try:
+        deleted = db.delete_old_irrelevant_records(days=settings.DB_CLEANUP_INTERVAL_DAYS)
+        if deleted:
+            logger.info(f"Cleanup: removed {deleted} old irrelevant record(s).")
+    except Exception as e:
+        logger.error(f"Cleanup job failed: {e}")
+
+
 def setup_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler()
 
-    # Job 1: Collect and analyze (every 5-15 mins)
+    # Job 1: Collect and analyze
     scheduler.add_job(
         fetch_and_analyze_job,
         "interval",
@@ -112,7 +132,7 @@ def setup_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
-    # Job 2: Send pending items (every 1 min for responsiveness)
+    # Job 2: Send pending items to Telegram (8h–22h BRT only)
     scheduler.add_job(
         send_pending_to_telegram_job,
         "interval",
@@ -120,6 +140,16 @@ def setup_scheduler() -> AsyncIOScheduler:
         id="send_to_telegram_job",
         replace_existing=True,
         misfire_grace_time=120,
+    )
+
+    # Job 3: Cleanup old irrelevant records (daily at 00:00 BRT)
+    scheduler.add_job(
+        cleanup_old_records_job,
+        "cron",
+        hour=3,
+        minute=0,
+        id="cleanup_old_records_job",
+        replace_existing=True,
     )
 
     return scheduler
