@@ -26,7 +26,7 @@ COMPANIES = {
     "@GoogleAI": "GoogleAI",
     "@GeminiApp": "GeminiApp",
     "@AIatMeta": "AIatMeta",
-    "@xai": "xai",
+    "@xai": "xAI",
     "@ManusAI": "ManusAI",
 
     # AI Products & Tools
@@ -41,13 +41,13 @@ COMPANIES = {
     "@bentossell": "bentossell",
     "@mreflow": "mreflow",
     "@bilawalsidhu": "bilawalsidhu",
-  
     "@morganlinton": "morganlinton",
 
     # AI News & Research
     "@AiBreakFast": "AiBreakFast",
-    "@therundownai": "therundownai",
+    "@TheRundownAI": "TheRundownAI",
     "@aiedge_": "aiedge_",
+    "@cgwts": "cgwts",
 }
 
 class TwitterCollector:
