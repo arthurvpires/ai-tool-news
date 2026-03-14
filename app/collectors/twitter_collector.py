@@ -47,7 +47,7 @@ COMPANIES = {
     "@AiBreakFast": "AiBreakFast",
     "@TheRundownAI": "TheRundownAI",
     "@aiedge_": "aiedge_",
-    "@cgwts": "cgwts",
+    "@cgtwts": "cgtwts",
 }
 
 class TwitterCollector:
