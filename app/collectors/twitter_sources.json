@@ -111,16 +111,12 @@
         "name": "Runway",
         "type": "OFFICIAL"
     },
-    "@Pika_Labs": {
+    "@pika_labs": {
         "name": "Pika Labs",
         "type": "OFFICIAL"
     },
     "@Replit": {
         "name": "Replit",
-        "type": "OFFICIAL"
-    },
-    "@LangChainAI": {
-        "name": "LangChainAI",
         "type": "OFFICIAL"
     },
     "@LumaLabsAI": {
@@ -131,11 +127,7 @@
         "name": "character_ai",
         "type": "OFFICIAL"
     },
-    "@AdeptAILabs": {
-        "name": "AdeptAILabs",
-        "type": "OFFICIAL"
-    },
-    "@EleutherAI": {
+    "@AiEleuther": {
         "name": "EleutherAI",
         "type": "OFFICIAL"
     },
@@ -146,14 +138,6 @@
     "@togethercompute": {
         "name": "TogetherAI",
         "type": "OFFICIAL"
-    },
-    "@FireworksAI_HQ": {
-        "name": "FireworksAI",
-        "type": "OFFICIAL"
-    },
-    "@karpathy": {
-        "name": "karpathy",
-        "type": "SECONDARY"
     },
     "@swyx": {
         "name": "swyx",
@@ -201,10 +185,6 @@
     },
     "@TestingCatalog": {
         "name": "TestingCatalog",
-        "type": "SECONDARY"
-    },
-    "@SuperhumanAI": {
-        "name": "SuperhumanAI",
         "type": "SECONDARY"
     },
     "@AIExplainedYT": {

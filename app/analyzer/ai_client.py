@@ -98,5 +98,3 @@ class AIClient:
 
             except Exception as e:
                 logger.warning(f"Provider {name} parse failed: {e}")
-        
-        return None

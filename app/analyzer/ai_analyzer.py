@@ -81,7 +81,7 @@ class AIAnalyzer:
         if not content or not existing_items:
             return {"is_duplicate": False, "confidence": 0, "reason": "No content or existing items to compare."}
 
-        if not self.openai_client and not self.groq_client:
+        if not self.ai_client.openai_client and not self.ai_client.groq_client:
             return {"is_duplicate": False, "confidence": 0, "reason": "No LLM client available for deduplication."}
 
         try:
