@@ -111,10 +111,6 @@
         "name": "Runway",
         "type": "OFFICIAL"
     },
-    "@pika_labs": {
-        "name": "Pika Labs",
-        "type": "OFFICIAL"
-    },
     "@Replit": {
         "name": "Replit",
         "type": "OFFICIAL"
@@ -125,10 +121,6 @@
     },
     "@character_ai": {
         "name": "character_ai",
-        "type": "OFFICIAL"
-    },
-    "@AiEleuther": {
-        "name": "EleutherAI",
         "type": "OFFICIAL"
     },
     "@GroqInc": {

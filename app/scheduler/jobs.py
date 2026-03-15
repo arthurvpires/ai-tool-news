@@ -75,6 +75,10 @@ async def fetch_and_analyze_job():
             continue
 
         analysis_result = analyzer.analyze(canonical_content)
+        if not analysis_result:
+            logger.warning(f"Analysis failed for {content_id}. Skipping.")
+            continue
+
         analyzed += 1
         await asyncio.sleep(2)
 

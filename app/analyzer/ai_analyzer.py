@@ -47,34 +47,34 @@ class AIAnalyzer:
 
         self.ai_client = AIClient()
 
-        if not self.ai_client.openai_client and not self.ai_client.groq_client:
-            logger.warning("No OPENAI_API_KEY or GROQ_API_KEY found. Analyzer will fall back to mocked logic.")
-
-    def analyze(self, content: Dict[str, Any]) -> Dict[str, Any]:
+    def analyze(self, content: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         text = content.get("text", "")
         content_id = content.get("id", "unknown")
 
         if not text:
             return {"relevant": False, "summary": "No text content", "relevance_score": 0}
 
-        result = self.ai_client.parse(
-            system_prompt=self.system_prompt,
-            user_prompt=f"Please analyze the following content:\n\n{text}",
-            response_format=AIAnalysisResult
-        )
+        try:
+            result = self.ai_client.parse(
+                system_prompt=self.system_prompt,
+                user_prompt=f"Please analyze the following content:\n\n{text}",
+                response_format=AIAnalysisResult
+            )
 
-        if result:
-            relevant = result.relevance_score >= MIN_RELEVANT_SCORE
-            mark = ">>>" if relevant else "   "
-            logger.info(f"{mark} [{result.relevance_score:>2}/10] {content_id} | {result.reason}")
-            return {
-                "relevant": relevant,
-                "relevance_score": result.relevance_score,
-                "summary": result.reason,
-                "category": result.category,
-            }
+            if result:
+                relevant = result.relevance_score >= MIN_RELEVANT_SCORE
+                mark = ">>>" if relevant else "   "
+                logger.info(f"{mark} [{result.relevance_score:>2}/10] {content_id} | {result.reason}")
+                return {
+                    "relevant": relevant,
+                    "relevance_score": result.relevance_score,
+                    "summary": result.reason,
+                    "category": result.category,
+                }
+        except Exception as e:
+            logger.error(f"AI analysis failed for {content_id}: {e}")
 
-        return self._mock_analyze(text)
+        return None
 
 
     def find_duplicate(self, content: str, existing_items: List[Dict[str, Any]]) -> Dict[str, Any]:
@@ -124,17 +124,6 @@ class AIAnalyzer:
         except Exception as e:
             logger.error(f"Deduplication check failed: {e}")
             return {"is_duplicate": False, "confidence": 0, "reason": f"Error: {e}"}
-
-    def _mock_analyze(self, text: str) -> Dict[str, Any]:
-        text_lower = text.lower()
-        is_relevant = any(keyword in text_lower for keyword in ["release", "launch", "new", "update", "model"])
-
-        return {
-            "relevant": is_relevant,
-            "summary": "Mocked summary: This seems to be an important update."
-            if is_relevant
-            else "Mocked summary: Not important.",
-        }
 
 
     def generate_daily_summary(self, items: List[Dict[str, Any]]) -> str:
