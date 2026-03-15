@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 
 BRT = timezone(timedelta(hours=-3))
 SEND_HOUR_START = 8
-SEND_HOUR_END = 22
+SEND_HOUR_END_WEEKDAY = 19
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.collectors.twitter_collector import TwitterCollector
@@ -94,8 +94,15 @@ async def fetch_and_analyze_job():
 async def send_pending_to_telegram_job():
     """Job 2: Send the single most relevant pending item to Telegram (08h–22h BRT only)."""
     now_brt = datetime.now(BRT)
-    if not (SEND_HOUR_START <= now_brt.hour < SEND_HOUR_END):
-        logger.debug(f"Outside send window ({now_brt.strftime('%H:%M')} BRT). Skipping.")
+    is_weekend = now_brt.strftime("%A") in ["Saturday", "Sunday"]
+
+    if is_weekend:
+        logger.debug("It's weekend. Skipping regular Telegram updates. Consolidated summary will be sent at 20:00.")
+        return
+
+    # Weekdays: 8am to 19pm
+    if not (SEND_HOUR_START <= now_brt.hour < SEND_HOUR_END_WEEKDAY):
+        logger.debug(f"Outside weekday send window ({now_brt.strftime('%H:%M')} BRT). Skipping.")
         return
 
     telegram_sender = TelegramSender()
@@ -146,6 +153,38 @@ async def cleanup_old_records_job():
         logger.error(f"Cleanup job failed: {e}")
 
 
+    except Exception as e:
+        logger.error(f"Cleanup job failed: {e}")
+
+
+async def send_daily_summary_job():
+    """Job 5: Generate and send a daily AI summary every Sat/Sun at 20:00 BRT."""
+    logger.info("--- Generating Daily AI Summary ---")
+    
+    # Fetch items from the last 24h
+    recent_items = db.get_recent_relevant_items(hours=24)
+    if not recent_items:
+        logger.info("No relevant items found for the daily summary.")
+        return
+
+    # Filter to only include VERY RELEVANT (e.g., score >= 7)
+    very_relevant = [item for item in recent_items if item.get("relevance_score", 0) >= 7]
+    
+    analyzer = AIAnalyzer()
+    summary_content = analyzer.generate_daily_summary(very_relevant if very_relevant else recent_items)
+
+    telegram_sender = TelegramSender()
+    try:
+        await telegram_sender.bot.send_message(
+            chat_id=settings.TELEGRAM_CHAT_ID,
+            text=summary_content,
+            parse_mode="Markdown"
+        )
+        logger.info("Daily summary sent successfully.")
+    except Exception as e:
+        logger.error(f"Failed to send daily summary: {e}")
+
+
 def setup_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler()
 
@@ -158,7 +197,7 @@ def setup_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
-    # Job 2: Send pending items to Telegram (8h–22h BRT only)
+    # Job 2: Send pending items to Telegram (8h–20h BRT only)
     scheduler.add_job(
         send_pending_to_telegram_job,
         "interval",
@@ -175,6 +214,18 @@ def setup_scheduler() -> AsyncIOScheduler:
         hour=3,
         minute=0,
         id="cleanup_old_records_job",
+        replace_existing=True,
+    )
+
+
+    # Job 5: Daily Summary (Saturday and Sunday at 20:00 BRT)
+    scheduler.add_job(
+        send_daily_summary_job,
+        "cron",
+        day_of_week="sat,sun",
+        hour=20,
+        minute=0,
+        id="daily_summary_job",
         replace_existing=True,
     )
 

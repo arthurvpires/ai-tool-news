@@ -40,10 +40,12 @@ class AIAnalyzer:
                 prompts = yaml.safe_load(f)
                 self.system_prompt = prompts.get("ai_scout", {}).get("system_prompt", "")
                 self.dedup_prompt = prompts.get("deduplicator", {}).get("system_prompt", "")
+                self.daily_prompt = prompts.get("daily_summary", {}).get("system_prompt", "")
         except Exception as e:
             logger.error(f"Failed to load prompts.yaml: {e}")
             self.system_prompt = "You are an AI news filter."
             self.dedup_prompt = "You are an AI duplicate detector."
+            self.daily_prompt = "Summarize the following AI news."
 
         self.openai_client = None
         self.groq_client = None
@@ -230,3 +232,43 @@ class AIAnalyzer:
             if is_relevant
             else "Mocked summary: Not important.",
         }
+
+
+    def generate_daily_summary(self, items: List[Dict[str, Any]]) -> str:
+        """Generate a daily AI summary from a list of relevant items."""
+        if not items:
+            return
+
+        news_list = ""
+        for item in items:
+            news_list += f"- [{item.get('company')}] {item.get('analysis_summary')} (Score: {item.get('relevance_score')})\n"
+
+        if self.openai_client:
+            try:
+                response = self.openai_client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": self.daily_prompt},
+                        {"role": "user", "content": f"Here is the news for today:\n\n{news_list}"},
+                    ],
+                    max_tokens=800,
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                logger.error(f"OpenAI daily summary failed: {e}")
+
+        if self.groq_client:
+            try:
+                response = self.groq_client.chat.completions.create(
+                    model="llama-3.3-70b-versatile",
+                    messages=[
+                        {"role": "system", "content": self.daily_prompt},
+                        {"role": "user", "content": f"Here is the news for today:\n\n{news_list}"},
+                    ],
+                    max_tokens=800,
+                )
+                return response.choices[0].message.content
+            except Exception as e:
+                logger.error(f"Groq daily summary failed: {e}")
+
+        return "Daily summary generation failed."
