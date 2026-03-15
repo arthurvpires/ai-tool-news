@@ -13,22 +13,27 @@ class AIClient:
     def __init__(self):
         self.providers = []
         
-        # Initialize OpenAI
-        if settings.OPENAI_API_KEY and settings.OPENAI_API_KEY != "your_openai_api_key":
+        # Initialize OpenAI if key is present and valid
+        if settings.OPENAI_API_KEY and settings.OPENAI_API_KEY not in ["", "your_openai_api_key"]:
             self.providers.append({
                 "name": "openai",
                 "client": OpenAI(api_key=settings.OPENAI_API_KEY),
                 "model": "gpt-4o-mini"
             })
-
-        # Initialize Groq
-        if settings.GROQ_API_KEY and settings.GROQ_API_KEY != "your_groq_api_key":
+            logger.info("OpenAI provider initialized.")
+            
+        # Otherwise, initialize Groq if key is present and valid
+        elif settings.GROQ_API_KEY and settings.GROQ_API_KEY not in ["", "your_groq_api_key"]:
             from groq import Groq
             self.providers.append({
                 "name": "groq",
                 "client": Groq(api_key=settings.GROQ_API_KEY),
                 "model": "llama-3.3-70b-versatile"
             })
+            logger.info("Groq provider initialized (OpenAI key missing or invalid).")
+        
+        else:
+            logger.warning("No valid OpenAI or Groq API key found.")
 
     @property
     def openai_client(self):
