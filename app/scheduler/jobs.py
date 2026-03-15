@@ -159,12 +159,18 @@ async def cleanup_old_records_job():
 
 async def send_daily_summary_job():
     """Job 5: Generate and send a daily AI summary every Sat/Sun at 20:00 BRT."""
-    logger.info("--- Generating Daily AI Summary ---")
+    logger.info("--- Generating Daily AI Summary (Weekend Window) ---")
     
-    # Fetch items from the last 24h
-    recent_items = db.get_recent_relevant_items(hours=24)
+    now_brt = datetime.now(BRT)
+    # Window: 00:00 to 19:55 BRT of today
+    today_start_brt = now_brt.replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start_utc = today_start_brt.astimezone(timezone.utc)
+    
+    # Fetch items since start of today BRT
+    recent_items = db.get_relevant_items_since(today_start_utc.isoformat())
+    
     if not recent_items:
-        logger.info("No relevant items found for the daily summary.")
+        logger.info("No relevant items found since 00:00 BRT today.")
         return
 
     # Filter to only include VERY RELEVANT (e.g., score >= 7)

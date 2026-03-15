@@ -83,11 +83,16 @@ def delete_old_irrelevant_records(days: int = 2) -> int:
 
 def get_recent_relevant_items(hours: int = 48):
     cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
+    return get_relevant_items_since(cutoff)
+
+
+def get_relevant_items_since(since_iso: str):
+    """Fetch relevant items since a specific ISO format timestamp."""
     result = (
         supabase.table(TABLE)
         .select("*")
         .eq("is_relevant", True)
-        .gte("timestamp", cutoff)
+        .gte("timestamp", since_iso)
         .order("timestamp", desc=True)
         .execute()
     )

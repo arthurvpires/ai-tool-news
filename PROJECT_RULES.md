@@ -19,7 +19,7 @@ All times are in **Brasília Time (BRT / UTC-3)**.
 ### Weekends (Saturday - Sunday)
 - **Consolidated Summary**: Sent at **20:00**.
 - **Regular Updates**: **PAUSED**. No individual news items are sent.
-- **Content**: A single AI-generated summary of the most relevant news (score ≥ 7) from the previous 24 hours.
+- **Content**: A single AI-generated summary of the most relevant news (score ≥ 7) collected from **00:00 to 19:55 of the current day**. This ensures that Saturday's news is summarized on Saturday and Sunday's news on Sunday, without overlap.
 
 ## 📡 Data Collection (Twitter/Nitter)
 
