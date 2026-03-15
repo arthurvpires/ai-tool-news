@@ -81,6 +81,25 @@ def delete_old_irrelevant_records(days: int = 2) -> int:
     return len(result.data) if result.data else 0
 
 
+def get_recent_relevant_items(hours: int = 48):
+    cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
+    result = (
+        supabase.table(TABLE)
+        .select("*")
+        .eq("is_relevant", True)
+        .gte("timestamp", cutoff)
+        .order("timestamp", desc=True)
+        .execute()
+    )
+    return result.data
+
+
+def update_is_relevant(content_id, is_relevant):
+    supabase.table(TABLE).update(
+        {"is_relevant": is_relevant}
+    ).eq("content_id", content_id).execute()
+
+
 def get_total_count():
     result = (
         supabase.table(TABLE)

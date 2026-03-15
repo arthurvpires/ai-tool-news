@@ -1,0 +1,214 @@
+{
+    "@OpenAI": {
+        "name": "OpenAI",
+        "type": "OFFICIAL"
+    },
+    "@AnthropicAI": {
+        "name": "AnthropicAI",
+        "type": "OFFICIAL"
+    },
+    "@ClaudeAI": {
+        "name": "ClaudeAI",
+        "type": "OFFICIAL"
+    },
+    "@Google": {
+        "name": "Google",
+        "type": "OFFICIAL"
+    },
+    "@GoogleAI": {
+        "name": "GoogleAI",
+        "type": "OFFICIAL"
+    },
+    "@GeminiApp": {
+        "name": "GeminiApp",
+        "type": "OFFICIAL"
+    },
+    "@AIatMeta": {
+        "name": "AIatMeta",
+        "type": "OFFICIAL"
+    },
+    "@xai": {
+        "name": "xAI",
+        "type": "OFFICIAL"
+    },
+    "@ManusAI": {
+        "name": "ManusAI",
+        "type": "OFFICIAL"
+    },
+    "@perplexity_ai": {
+        "name": "perplexity_ai",
+        "type": "OFFICIAL"
+    },
+    "@midjourney": {
+        "name": "midjourney",
+        "type": "OFFICIAL"
+    },
+    "@cursor_ai": {
+        "name": "cursor_ai",
+        "type": "OFFICIAL"
+    },
+    "@vercel": {
+        "name": "vercel",
+        "type": "OFFICIAL"
+    },
+    "@openclaw": {
+        "name": "openclaw",
+        "type": "OFFICIAL"
+    },
+    "@sama": {
+        "name": "sama",
+        "type": "OFFICIAL"
+    },
+    "@bentossell": {
+        "name": "bentossell",
+        "type": "SECONDARY"
+    },
+    "@mreflow": {
+        "name": "mreflow",
+        "type": "SECONDARY"
+    },
+    "@bilawalsidhu": {
+        "name": "bilawalsidhu",
+        "type": "SECONDARY"
+    },
+    "@morganlinton": {
+        "name": "morganlinton",
+        "type": "SECONDARY"
+    },
+    "@AiBreakFast": {
+        "name": "AiBreakFast",
+        "type": "SECONDARY"
+    },
+    "@TheRundownAI": {
+        "name": "TheRundownAI",
+        "type": "SECONDARY"
+    },
+    "@aiedge_": {
+        "name": "aiedge_",
+        "type": "SECONDARY"
+    },
+    "@cgtwts": {
+        "name": "cgtwts",
+        "type": "SECONDARY"
+    },
+    "@MistralAI": {
+        "name": "MistralAI",
+        "type": "OFFICIAL"
+    },
+    "@StabilityAI": {
+        "name": "StabilityAI",
+        "type": "OFFICIAL"
+    },
+    "@cohere": {
+        "name": "Cohere",
+        "type": "OFFICIAL"
+    },
+    "@huggingface": {
+        "name": "HuggingFace",
+        "type": "OFFICIAL"
+    },
+    "@runwayml": {
+        "name": "Runway",
+        "type": "OFFICIAL"
+    },
+    "@Pika_Labs": {
+        "name": "Pika Labs",
+        "type": "OFFICIAL"
+    },
+    "@Replit": {
+        "name": "Replit",
+        "type": "OFFICIAL"
+    },
+    "@LangChainAI": {
+        "name": "LangChainAI",
+        "type": "OFFICIAL"
+    },
+    "@LumaLabsAI": {
+        "name": "LumaLabsAI",
+        "type": "OFFICIAL"
+    },
+    "@character_ai": {
+        "name": "character_ai",
+        "type": "OFFICIAL"
+    },
+    "@AdeptAILabs": {
+        "name": "AdeptAILabs",
+        "type": "OFFICIAL"
+    },
+    "@EleutherAI": {
+        "name": "EleutherAI",
+        "type": "OFFICIAL"
+    },
+    "@GroqInc": {
+        "name": "Groq",
+        "type": "OFFICIAL"
+    },
+    "@togethercompute": {
+        "name": "TogetherAI",
+        "type": "OFFICIAL"
+    },
+    "@FireworksAI_HQ": {
+        "name": "FireworksAI",
+        "type": "OFFICIAL"
+    },
+    "@karpathy": {
+        "name": "karpathy",
+        "type": "SECONDARY"
+    },
+    "@swyx": {
+        "name": "swyx",
+        "type": "SECONDARY"
+    },
+    "@AndrewYNg": {
+        "name": "AndrewYNg",
+        "type": "SECONDARY"
+    },
+    "@jeremyphoward": {
+        "name": "jeremyphoward",
+        "type": "SECONDARY"
+    },
+    "@ylecun": {
+        "name": "ylecun",
+        "type": "SECONDARY"
+    },
+    "@emollick": {
+        "name": "emollick",
+        "type": "SECONDARY"
+    },
+    "@simonw": {
+        "name": "simonw",
+        "type": "SECONDARY"
+    },
+    "@nrehiew_": {
+        "name": "nrehiew_",
+        "type": "SECONDARY"
+    },
+    "@levelsio": {
+        "name": "levelsio",
+        "type": "SECONDARY"
+    },
+    "@paulg": {
+        "name": "paulg",
+        "type": "SECONDARY"
+    },
+    "@rowancheung": {
+        "name": "rowancheung",
+        "type": "SECONDARY"
+    },
+    "@futurepedia_io": {
+        "name": "futurepedia_io",
+        "type": "SECONDARY"
+    },
+    "@TestingCatalog": {
+        "name": "TestingCatalog",
+        "type": "SECONDARY"
+    },
+    "@SuperhumanAI": {
+        "name": "SuperhumanAI",
+        "type": "SECONDARY"
+    },
+    "@AIExplainedYT": {
+        "name": "AIExplainedYT",
+        "type": "SECONDARY"
+    }
+}

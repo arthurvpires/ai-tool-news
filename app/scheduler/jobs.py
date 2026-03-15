@@ -34,13 +34,23 @@ async def fetch_and_analyze_job():
         except Exception as e:
             logger.error(f"Collector {collector.__class__.__name__} failed: {e}")
 
+    # Sort content so OFFICIAL sources are processed first
+    # This ensures that if both an official source and an influencer are in the same batch,
+    # the official one is processed first and the influencer one is marked as a duplicate.
+    all_content.sort(key=lambda x: 0 if x.get("source_type") == "OFFICIAL" else 1)
+
+    # Fetch recent relevant items for deduplication
+    recent_relevant = db.get_recent_relevant_items(hours=24)
+
     skipped = 0
     analyzed = 0
     relevant = 0
+    duplicates = 0
 
     for item in all_content:
         content_id = item.get("id")
         source = item.get("source", "unknown")
+        source_type = item.get("source_type", "unknown")
 
         if not content_id:
             continue
@@ -50,6 +60,20 @@ async def fetch_and_analyze_job():
             continue
 
         canonical_content = media_extractor.extract_media(item)
+        
+        # Deduplication check
+        dup_result = analyzer.find_duplicate(canonical_content.get("text", ""), recent_relevant)
+        if dup_result.get("is_duplicate"):
+            duplicates += 1
+            logger.info(f"Duplicate detected: {content_id} is a duplicate of {dup_result.get('duplicate_id')}. Reason: {dup_result.get('reason')}")
+            
+            # Policy: If we find a duplicate, we skip it.
+            # If the NEW item is OFFICIAL and the existing one is NOT, we could swap them,
+            # but usually official sources post first or we process them first in this loop.
+            # To keep it safe, we mark it as processed but not relevant.
+            db.mark_content_processed(content_id, source, metadata={**canonical_content, "relevant": False, "summary": f"Duplicate of {dup_result.get('duplicate_id')}"})
+            continue
+
         analysis_result = analyzer.analyze(canonical_content)
         analyzed += 1
         await asyncio.sleep(2)
@@ -59,9 +83,11 @@ async def fetch_and_analyze_job():
 
         if analysis_result.get("relevant"):
             relevant += 1
+            # Add to recent relevant for subsequent items in the same batch
+            recent_relevant.append({"content_id": content_id, "text": canonical_content.get("text", ""), "source_type": source_type})
 
     logger.info(
-        f"--- Cycle done | Collected: {len(all_content)} | Skipped: {skipped} | Analyzed: {analyzed} | Relevant: {relevant} ---"
+        f"--- Cycle done | Collected: {len(all_content)} | Skipped: {skipped} | Duplicates: {duplicates} | Analyzed: {analyzed} | Relevant: {relevant} ---"
     )
 
 

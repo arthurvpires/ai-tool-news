@@ -25,6 +25,13 @@ class AIAnalysisResult(BaseModel):
     category: str = Field(description="The category of the update.")
 
 
+class AIComparisonResult(BaseModel):
+    is_duplicate: bool = Field(description="Whether the new post is a duplicate of the existing one.")
+    confidence: float = Field(description="Confidence score from 0 to 1.0.")
+    event_summary: str = Field(default="", description="One short sentence describing the event.")
+    reason: str = Field(description="Short explanation of why it is or is not a duplicate.")
+
+
 class AIAnalyzer:
     def __init__(self):
         prompt_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "prompts.yaml")
@@ -32,9 +39,11 @@ class AIAnalyzer:
             with open(prompt_path, "r", encoding="utf-8") as f:
                 prompts = yaml.safe_load(f)
                 self.system_prompt = prompts.get("ai_scout", {}).get("system_prompt", "")
+                self.dedup_prompt = prompts.get("deduplicator", {}).get("system_prompt", "")
         except Exception as e:
             logger.error(f"Failed to load prompts.yaml: {e}")
             self.system_prompt = "You are an AI news filter."
+            self.dedup_prompt = "You are an AI duplicate detector."
 
         self.openai_client = None
         self.groq_client = None
@@ -132,6 +141,84 @@ class AIAnalyzer:
             "summary": reason,
             "category": result_json.get("category", "other"),
         }
+
+    def find_duplicate(self, content: str, existing_items: List[Dict[str, Any]]) -> Dict[str, Any]:
+        if not content or not existing_items:
+            return {"is_duplicate": False, "confidence": 0, "reason": "No content or existing items to compare."}
+
+        if not self.openai_client and not self.groq_client:
+            return {"is_duplicate": False, "confidence": 0, "reason": "No LLM client available for deduplication."}
+
+        try:
+            # We compare with the top 5 most recent/relevant items to save tokens
+            logger.info(f"Checking for duplicates among {len(existing_items[:5])} recent items...")
+            for item in existing_items[:5]:
+                existing_text = item.get("text", "")
+                if not existing_text:
+                    continue
+
+                if self.openai_client:
+                    response = self.openai_client.beta.chat.completions.parse(
+                        model="gpt-4o-mini",
+                        messages=[
+                            {"role": "system", "content": self.dedup_prompt},
+                            {
+                                "role": "user",
+                                "content": f"New Post:\n{content}\n\nExisting Post:\n{existing_text}",
+                            },
+                        ],
+                        response_format=AIComparisonResult,
+                        max_tokens=200,
+                    )
+                    result = response.choices[0].message.parsed
+                    is_duplicate = result.is_duplicate
+                    confidence = result.confidence
+                    reason = result.reason
+                    event_summary = result.event_summary
+                elif self.groq_client:
+                    # Fallback to Groq
+                    model = GROQ_MODELS[1] if len(GROQ_MODELS) > 1 else GROQ_MODELS[0]
+                    response = self.groq_client.chat.completions.create(
+                        model=model,
+                        messages=[
+                            {
+                                "role": "system",
+                                "content": self.dedup_prompt
+                                + "\n\nReturn EXACTLY a valid JSON object with the keys: 'is_duplicate' (bool), 'confidence' (float), 'event_summary' (string), and 'reason' (string).",
+                            },
+                            {
+                                "role": "user",
+                                "content": f"New Post:\n{content}\n\nExisting Post:\n{existing_text}",
+                            },
+                        ],
+                        response_format={"type": "json_object"},
+                        max_tokens=200,
+                    )
+                    result_json = json.loads(response.choices[0].message.content)
+                    is_duplicate = bool(result_json.get("is_duplicate", False))
+                    confidence = float(result_json.get("confidence", 0.0))
+                    reason = str(result_json.get("reason", ""))
+                    event_summary = str(result_json.get("event_summary", ""))
+                else:
+                    continue
+
+                if is_duplicate:
+                    logger.info(f"  - Dup Found? {is_duplicate} | Conf: {confidence:.2f} | Event: {event_summary} | Reason: {reason}")
+                else:
+                    logger.debug(f"  - Not a duplicate of {item.get('content_id')} (Conf: {confidence:.2f})")
+
+                if is_duplicate and confidence > 0.7:
+                    return {
+                        "is_duplicate": True,
+                        "confidence": confidence,
+                        "reason": reason,
+                        "duplicate_id": item.get("content_id"),
+                    }
+            
+            return {"is_duplicate": False, "confidence": 0, "reason": "No duplicates found among recent items."}
+        except Exception as e:
+            logger.error(f"Deduplication check failed: {e}")
+            return {"is_duplicate": False, "confidence": 0, "reason": f"Error: {e}"}
 
     def _mock_analyze(self, text: str) -> Dict[str, Any]:
         text_lower = text.lower()

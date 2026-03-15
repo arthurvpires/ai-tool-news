@@ -6,6 +6,9 @@ import time
 from datetime import datetime, timezone
 from bs4 import BeautifulSoup
 
+import os
+import json
+
 logger = logging.getLogger(__name__)
 
 # List of RSS feeds to monitor using nitter proxies
@@ -17,42 +20,19 @@ NITTER_INSTANCES = [
     "https://nitter.no-logs.com",
 ]
 
-COMPANIES = {
-    # Major AI Labs
-    "@OpenAI": "OpenAI",
-    "@AnthropicAI": "AnthropicAI",
-    "@ClaudeAI": "ClaudeAI",
-    "@Google": "Google",
-    "@GoogleAI": "GoogleAI",
-    "@GeminiApp": "GeminiApp",
-    "@AIatMeta": "AIatMeta",
-    "@xai": "xAI",
-    "@ManusAI": "ManusAI",
-
-    # AI Products & Tools
-    "@perplexity_ai": "perplexity_ai",
-    "@midjourney": "midjourney",
-    "@cursor_ai": "cursor_ai",
-    "@vercel": "vercel",
-    "@openclaw": "openclaw",
-
-    # Key People
-    "@sama": "sama",
-    "@bentossell": "bentossell",
-    "@mreflow": "mreflow",
-    "@bilawalsidhu": "bilawalsidhu",
-    "@morganlinton": "morganlinton",
-
-    # AI News & Research
-    "@AiBreakFast": "AiBreakFast",
-    "@TheRundownAI": "TheRundownAI",
-    "@aiedge_": "aiedge_",
-    "@cgtwts": "cgtwts",
-}
-
 class TwitterCollector:
     def __init__(self):
-        pass
+        self.companies = {}
+        self._load_companies()
+
+    def _load_companies(self):
+        try:
+            companies_path = os.path.join(os.path.dirname(__file__), "twitter_sources.json")
+            with open(companies_path, "r", encoding="utf-8") as f:
+                self.companies = json.load(f)
+        except Exception as e:
+            logger.error(f"Failed to load companies.json: {e}")
+            self.companies = {}
 
     def fetch_latest_tweets(self) -> List[Dict[str, Any]]:
         return self._fetch_from_rss()
@@ -60,11 +40,13 @@ class TwitterCollector:
     def _fetch_from_rss(self) -> List[Dict[str, Any]]:
         collected = []
         now = datetime.now(timezone.utc)
-        total_accounts = len(COMPANIES)
+        total_accounts = len(self.companies)
         fetched_accounts = 0
         failed_list = []
 
-        for handle, username in COMPANIES.items():
+        for handle, info in self.companies.items():
+            username = info["name"]
+            source_type = info["type"]
             success = False
             for instance in NITTER_INSTANCES:
                 rss_url = f"{instance}/{username}/rss"
@@ -176,6 +158,7 @@ class TwitterCollector:
                             {
                                 "source": "twitter",
                                 "company": handle,
+                                "source_type": source_type,
                                 "text": text,
                                 "images": images,
                                 "video": tweet_url
