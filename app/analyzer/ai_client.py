@@ -30,8 +30,6 @@ class AIClient:
                 "client": Groq(api_key=settings.GROQ_API_KEY),
                 "model": "llama-3.3-70b-versatile"
             })
-            logger.info("Groq provider initialized (OpenAI key missing or invalid).")
-        
         else:
             logger.warning("No valid OpenAI or Groq API key found.")
 

@@ -187,6 +187,12 @@ async def send_daily_summary_job():
             parse_mode="Markdown"
         )
         logger.info("Daily summary sent successfully.")
+
+        # Mark all items from today as sent so they aren't resent individually on Monday
+        for item in recent_items:
+            db.mark_item_sent(item["content_id"])
+        logger.info(f"Marked {len(recent_items)} items as sent.")
+
     except Exception as e:
         logger.error(f"Failed to send daily summary: {e}")
 
