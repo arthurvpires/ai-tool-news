@@ -1,12 +1,10 @@
 from typing import Dict, Any, List
 import logging
-from openai import OpenAI
-from pydantic import BaseModel, Field
-from app.config import settings
 import json
-
 import yaml
 import os
+from pydantic import BaseModel, Field
+from app.analyzer.ai_client import AIClient
 
 logger = logging.getLogger(__name__)
 
@@ -47,20 +45,9 @@ class AIAnalyzer:
             self.dedup_prompt = "You are an AI duplicate detector."
             self.daily_prompt = "Summarize the following AI news."
 
-        self.openai_client = None
-        self.groq_client = None
+        self.ai_client = AIClient()
 
-        has_openai = settings.OPENAI_API_KEY and settings.OPENAI_API_KEY != "your_openai_api_key"
-        has_groq = settings.GROQ_API_KEY and settings.GROQ_API_KEY != "your_groq_api_key"
-
-        if has_openai:
-            self.openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
-
-        if has_groq:
-            from groq import Groq
-            self.groq_client = Groq(api_key=settings.GROQ_API_KEY)
-
-        if not has_openai and not has_groq:
+        if not self.ai_client.openai_client and not self.ai_client.groq_client:
             logger.warning("No OPENAI_API_KEY or GROQ_API_KEY found. Analyzer will fall back to mocked logic.")
 
     def analyze(self, content: Dict[str, Any]) -> Dict[str, Any]:
@@ -70,79 +57,25 @@ class AIAnalyzer:
         if not text:
             return {"relevant": False, "summary": "No text content", "relevance_score": 0}
 
-        if self.openai_client:
-            try:
-                return self._call_openai(text, content_id)
-            except Exception as e:
-                logger.warning(f"OpenAI failed for {content_id}: {e}")
-                if not self.groq_client:
-                    return {"relevant": False, "summary": "Analysis failed", "relevance_score": 0}
-                logger.warning(f"Falling back to Groq...")
+        result = self.ai_client.parse(
+            system_prompt=self.system_prompt,
+            user_prompt=f"Please analyze the following content:\n\n{text}",
+            response_format=AIAnalysisResult
+        )
 
-        if self.groq_client:
-            return self._call_groq_with_fallback(text, content_id)
+        if result:
+            relevant = result.relevance_score >= MIN_RELEVANT_SCORE
+            mark = ">>>" if relevant else "   "
+            logger.info(f"{mark} [{result.relevance_score:>2}/10] {content_id} | {result.reason}")
+            return {
+                "relevant": relevant,
+                "relevance_score": result.relevance_score,
+                "summary": result.reason,
+                "category": result.category,
+            }
 
         return self._mock_analyze(text)
 
-    def _call_openai(self, text, content_id):
-        response = self.openai_client.beta.chat.completions.parse(
-            model="gpt-4o-mini",
-            messages=[
-                {"role": "system", "content": self.system_prompt},
-                {"role": "user", "content": f"Please analyze the following content:\n\n{text}"},
-            ],
-            response_format=AIAnalysisResult,
-            max_tokens=300,
-        )
-        result = response.choices[0].message.parsed
-        relevant = result.relevance_score >= MIN_RELEVANT_SCORE
-        mark = ">>>" if relevant else "   "
-        logger.info(f"{mark} [{result.relevance_score:>2}/10] {content_id} | {result.reason}")
-        return {
-            "relevant": relevant,
-            "relevance_score": result.relevance_score,
-            "summary": result.reason,
-            "category": result.category,
-        }
-
-    def _call_groq_with_fallback(self, text, content_id):
-        for i, model in enumerate(GROQ_MODELS):
-            try:
-                return self._call_groq(model, text, content_id)
-            except Exception as e:
-                is_last = i == len(GROQ_MODELS) - 1
-                if is_last:
-                    logger.error(f"All Groq models failed for {content_id}: {e}")
-                    return {"relevant": False, "summary": "Analysis failed", "relevance_score": 0}
-                logger.warning(f"Groq {model} failed, trying next model...")
-
-    def _call_groq(self, model, text, content_id):
-        response = self.groq_client.chat.completions.create(
-            model=model,
-            messages=[
-                {
-                    "role": "system",
-                    "content": self.system_prompt
-                    + "\n\nReturn EXACTLY a valid JSON object with the keys: 'relevance_score' (int), 'reason' (string), and 'category' (string).",
-                },
-                {"role": "user", "content": f"Please analyze the following content:\n\n{text}"},
-            ],
-            response_format={"type": "json_object"},
-            max_tokens=300,
-        )
-        result_json = json.loads(response.choices[0].message.content)
-        score = int(result_json.get("relevance_score", 0))
-        relevant = score >= MIN_RELEVANT_SCORE
-        reason = str(result_json.get("reason", result_json.get("summary", "")))
-
-        mark = ">>>" if relevant else "   "
-        logger.info(f"{mark} [{score:>2}/10] {content_id} | {reason}")
-        return {
-            "relevant": relevant,
-            "relevance_score": score,
-            "summary": reason,
-            "category": result_json.get("category", "other"),
-        }
 
     def find_duplicate(self, content: str, existing_items: List[Dict[str, Any]]) -> Dict[str, Any]:
         if not content or not existing_items:
@@ -159,50 +92,20 @@ class AIAnalyzer:
                 if not existing_text:
                     continue
 
-                if self.openai_client:
-                    response = self.openai_client.beta.chat.completions.parse(
-                        model="gpt-4o-mini",
-                        messages=[
-                            {"role": "system", "content": self.dedup_prompt},
-                            {
-                                "role": "user",
-                                "content": f"New Post:\n{content}\n\nExisting Post:\n{existing_text}",
-                            },
-                        ],
-                        response_format=AIComparisonResult,
-                        max_tokens=200,
-                    )
-                    result = response.choices[0].message.parsed
-                    is_duplicate = result.is_duplicate
-                    confidence = result.confidence
-                    reason = result.reason
-                    event_summary = result.event_summary
-                elif self.groq_client:
-                    # Fallback to Groq
-                    model = GROQ_MODELS[1] if len(GROQ_MODELS) > 1 else GROQ_MODELS[0]
-                    response = self.groq_client.chat.completions.create(
-                        model=model,
-                        messages=[
-                            {
-                                "role": "system",
-                                "content": self.dedup_prompt
-                                + "\n\nReturn EXACTLY a valid JSON object with the keys: 'is_duplicate' (bool), 'confidence' (float), 'event_summary' (string), and 'reason' (string).",
-                            },
-                            {
-                                "role": "user",
-                                "content": f"New Post:\n{content}\n\nExisting Post:\n{existing_text}",
-                            },
-                        ],
-                        response_format={"type": "json_object"},
-                        max_tokens=200,
-                    )
-                    result_json = json.loads(response.choices[0].message.content)
-                    is_duplicate = bool(result_json.get("is_duplicate", False))
-                    confidence = float(result_json.get("confidence", 0.0))
-                    reason = str(result_json.get("reason", ""))
-                    event_summary = str(result_json.get("event_summary", ""))
-                else:
+                result = self.ai_client.parse(
+                    system_prompt=self.dedup_prompt,
+                    user_prompt=f"New Post:\n{content}\n\nExisting Post:\n{existing_text}",
+                    response_format=AIComparisonResult,
+                    max_tokens=200
+                )
+
+                if not result:
                     continue
+
+                is_duplicate = result.is_duplicate
+                confidence = result.confidence
+                reason = result.reason
+                event_summary = result.event_summary
 
                 if is_duplicate:
                     logger.info(f"  - Dup Found? {is_duplicate} | Conf: {confidence:.2f} | Event: {event_summary} | Reason: {reason}")
@@ -243,32 +146,8 @@ class AIAnalyzer:
         for item in items:
             news_list += f"- [{item.get('company')}] {item.get('analysis_summary')} (Score: {item.get('relevance_score')})\n"
 
-        if self.openai_client:
-            try:
-                response = self.openai_client.chat.completions.create(
-                    model="gpt-4o-mini",
-                    messages=[
-                        {"role": "system", "content": self.daily_prompt},
-                        {"role": "user", "content": f"Here is the news for today:\n\n{news_list}"},
-                    ],
-                    max_tokens=800,
-                )
-                return response.choices[0].message.content
-            except Exception as e:
-                logger.error(f"OpenAI daily summary failed: {e}")
-
-        if self.groq_client:
-            try:
-                response = self.groq_client.chat.completions.create(
-                    model="llama-3.3-70b-versatile",
-                    messages=[
-                        {"role": "system", "content": self.daily_prompt},
-                        {"role": "user", "content": f"Here is the news for today:\n\n{news_list}"},
-                    ],
-                    max_tokens=800,
-                )
-                return response.choices[0].message.content
-            except Exception as e:
-                logger.error(f"Groq daily summary failed: {e}")
-
-        return "Daily summary generation failed."
+        return self.ai_client.completion(
+            system_prompt=self.daily_prompt,
+            user_prompt=f"Here is the news for today:\n\n{news_list}",
+            max_tokens=800
+        ) or "Daily summary generation failed."
