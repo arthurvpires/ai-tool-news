@@ -81,11 +81,6 @@ def delete_old_irrelevant_records(days: int = 2) -> int:
     return len(result.data) if result.data else 0
 
 
-def get_recent_relevant_items(hours: int = 48):
-    cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
-    return get_relevant_items_since(cutoff)
-
-
 def get_relevant_items_since(since_iso: str):
     """Fetch relevant items since a specific ISO format timestamp."""
     result = (
@@ -103,19 +98,6 @@ def update_is_relevant(content_id, is_relevant):
     supabase.table(TABLE).update(
         {"is_relevant": is_relevant}
     ).eq("content_id", content_id).execute()
-
-
-def get_recent_sent_summaries(hours=12):
-    cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
-    result = (
-        supabase.table(TABLE)
-        .select("analysis_summary")
-        .eq("is_relevant", True)
-        .not_.is_("sent_at", "null")
-        .gte("timestamp", cutoff)
-        .execute()
-    )
-    return [r["analysis_summary"] for r in result.data if r.get("analysis_summary")]
 
 
 def get_total_count():

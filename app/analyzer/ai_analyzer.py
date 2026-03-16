@@ -1,6 +1,5 @@
 from typing import Dict, Any, List, Optional
 import logging
-import json
 import yaml
 import os
 from pydantic import BaseModel, Field
@@ -23,13 +22,6 @@ class AIAnalysisResult(BaseModel):
     category: str = Field(description="The category of the update.")
 
 
-class AIComparisonResult(BaseModel):
-    is_duplicate: bool = Field(description="Whether the new post is a duplicate of the existing one.")
-    confidence: float = Field(description="Confidence score from 0 to 1.0.")
-    event_summary: str = Field(default="", description="One short sentence describing the event.")
-    reason: str = Field(description="Short explanation of why it is or is not a duplicate.")
-
-
 class AIAnalyzer:
     def __init__(self):
         prompt_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "prompts.yaml")
@@ -37,12 +29,10 @@ class AIAnalyzer:
             with open(prompt_path, "r", encoding="utf-8") as f:
                 prompts = yaml.safe_load(f)
                 self.system_prompt = prompts.get("ai_scout", {}).get("system_prompt", "")
-                self.dedup_prompt = prompts.get("deduplicator", {}).get("system_prompt", "")
                 self.daily_prompt = prompts.get("daily_summary", {}).get("system_prompt", "")
         except Exception as e:
             logger.error(f"Failed to load prompts.yaml: {e}")
             self.system_prompt = "You are an AI news filter."
-            self.dedup_prompt = "You are an AI duplicate detector."
             self.daily_prompt = "Summarize the following AI news."
 
         self.ai_client = AIClient()
@@ -78,55 +68,6 @@ class AIAnalyzer:
             logger.error(f"AI analysis failed for {content_id}: {e}")
 
         return None
-
-
-    def find_duplicate(self, content: str, existing_items: List[Dict[str, Any]]) -> Dict[str, Any]:
-        if not content or not existing_items:
-            return {"is_duplicate": False, "confidence": 0, "reason": "No content or existing items to compare."}
-
-        if not self.ai_client.openai_client and not self.ai_client.groq_client:
-            return {"is_duplicate": False, "confidence": 0, "reason": "No LLM client available for deduplication."}
-
-        try:
-            # We compare with the top 5 most recent/relevant items to save tokens
-            logger.info(f"Checking for duplicates among {len(existing_items[:5])} recent items...")
-            for item in existing_items[:5]:
-                existing_text = item.get("text", "")
-                if not existing_text:
-                    continue
-
-                result = self.ai_client.parse(
-                    system_prompt=self.dedup_prompt,
-                    user_prompt=f"New Post:\n{content}\n\nExisting Post:\n{existing_text}",
-                    response_format=AIComparisonResult,
-                    max_tokens=200
-                )
-
-                if not result:
-                    continue
-
-                is_duplicate = result.is_duplicate
-                confidence = result.confidence
-                reason = result.reason
-                event_summary = result.event_summary
-
-                if is_duplicate:
-                    logger.info(f"  - Dup Found? {is_duplicate} | Conf: {confidence:.2f} | Event: {event_summary} | Reason: {reason}")
-                else:
-                    logger.debug(f"  - Not a duplicate of {item.get('content_id')} (Conf: {confidence:.2f})")
-
-                if is_duplicate and confidence > 0.7:
-                    return {
-                        "is_duplicate": True,
-                        "confidence": confidence,
-                        "reason": reason,
-                        "duplicate_id": item.get("content_id"),
-                    }
-            
-            return {"is_duplicate": False, "confidence": 0, "reason": "No duplicates found among recent items."}
-        except Exception as e:
-            logger.error(f"Deduplication check failed: {e}")
-            return {"is_duplicate": False, "confidence": 0, "reason": f"Error: {e}"}
 
 
     def generate_daily_summary(self, items: List[Dict[str, Any]]) -> str:

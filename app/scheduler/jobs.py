@@ -19,36 +19,6 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
-def _word_overlap(summary, sent_summaries):
-    """Fast word-matching check. Returns overlap ratio of best match."""
-    if not summary or not sent_summaries:
-        return 0.0
-    words = set(summary.lower().split())
-    best = 0.0
-    for sent in sent_summaries:
-        sent_words = set(sent.lower().split())
-        common = words & sent_words
-        if len(common) >= 3:
-            ratio = len(common) / max(len(words), len(sent_words))
-            best = max(best, ratio)
-    return best
-
-
-def _check_duplicate(analyzer, text, summary, recent_relevant, recent_summaries):
-    """Two-tier dedup: word-matching first, AI dedup only if borderline."""
-    overlap = _word_overlap(summary, recent_summaries)
-
-    if overlap > 0.5:
-        return True, "word-match"
-
-    if overlap > 0.25 and recent_relevant:
-        dup_result = analyzer.find_duplicate(text, recent_relevant[:1])
-        if dup_result.get("is_duplicate") and dup_result.get("confidence", 0) > 0.7:
-            return True, f"AI-confirmed (vs {dup_result.get('duplicate_id', '?')})"
-
-    return False, None
-
-
 async def fetch_and_analyze_job():
     """Job 1: Fetch content from collectors and perform AI analysis."""
     logger.info("--- Collection cycle started ---")
@@ -67,13 +37,9 @@ async def fetch_and_analyze_job():
 
     all_content.sort(key=lambda x: 0 if x.get("source_type") == "OFFICIAL" else 1)
 
-    recent_summaries = db.get_recent_sent_summaries(hours=12)
-    recent_relevant = db.get_recent_relevant_items(hours=24)
-
     skipped = 0
     analyzed = 0
     relevant = 0
-    duplicates = 0
 
     rate_limited = False
 
@@ -90,6 +56,8 @@ async def fetch_and_analyze_job():
 
         canonical_content = media_extractor.extract_media(item)
 
+        await asyncio.sleep(6)
+
         try:
             analysis_result = analyzer.analyze(canonical_content)
         except RateLimitExhausted as e:
@@ -102,33 +70,16 @@ async def fetch_and_analyze_job():
             continue
 
         analyzed += 1
-        await asyncio.sleep(2)
-
-        if analysis_result.get("relevant"):
-            is_dup, reason = _check_duplicate(
-                analyzer,
-                canonical_content.get("text", ""),
-                analysis_result.get("summary", ""),
-                recent_relevant,
-                recent_summaries,
-            )
-            if is_dup:
-                duplicates += 1
-                analysis_result["relevant"] = False
-                analysis_result["summary"] = f"Duplicate ({reason}): " + analysis_result.get("summary", "")
-                logger.info(f"    Duplicate skipped ({reason}): {content_id}")
 
         metadata = {**canonical_content, **analysis_result}
         db.mark_content_processed(content_id, source, metadata=metadata)
 
         if analysis_result.get("relevant"):
             relevant += 1
-            recent_summaries.append(analysis_result.get("summary", ""))
-            recent_relevant.append({"content_id": content_id, "text": canonical_content.get("text", "")})
 
     status = "PAUSED (rate limit)" if rate_limited else "done"
     logger.info(
-        f"--- Cycle {status} | Collected: {len(all_content)} | Skipped: {skipped} | Duplicates: {duplicates} | Analyzed: {analyzed} | Relevant: {relevant} ---"
+        f"--- Cycle {status} | Collected: {len(all_content)} | Skipped: {skipped} | Analyzed: {analyzed} | Relevant: {relevant} ---"
     )
 
 

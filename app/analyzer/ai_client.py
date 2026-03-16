@@ -38,7 +38,6 @@ def _is_rate_limit(e):
 def _handle_rate_limit(e, provider_name, attempt, max_retries):
     wait = _extract_wait_seconds(e)
     if wait > DAILY_LIMIT_THRESHOLD:
-        logger.warning(f"Daily limit hit ({provider_name}). Need to wait {wait/60:.0f}min. Stopping cycle.")
         raise RateLimitExhausted(f"Daily limit reached for {provider_name}. Retry in {wait/60:.0f}min.")
     if attempt < max_retries:
         capped = min(wait, SHORT_LIMIT_MAX_WAIT)

@@ -43,11 +43,7 @@ All times are in **Brasília Time (BRT / UTC-3)**.
 - **Official Sources** take precedence over **Secondary Sources** (influencers).
 - If multiple sources report the same news, the system should favor the official announcement.
 
-### 3. Deduplication
-- Every new item must be compared against recent relevant items (last 5-10) using the `deduplicator` prompt.
-- High confidence matches (> 0.7) should be skipped to avoid spam.
-
-### 4. Code Quality
+### 3. Code Quality
 - All time-based logic must explicitly use the `BRT` timezone.
 - Use structured parsing (Pydantic models) for all AI outputs.
 - Keep `prompts.yaml` organized and modular.
