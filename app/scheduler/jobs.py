@@ -18,6 +18,18 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
+def _is_duplicate_topic(summary, sent_summaries):
+    if not summary or not sent_summaries:
+        return False
+    words = set(summary.lower().split())
+    for sent in sent_summaries:
+        sent_words = set(sent.lower().split())
+        common = words & sent_words
+        if len(common) >= 3 and len(common) / max(len(words), len(sent_words)) > 0.4:
+            return True
+    return False
+
+
 async def fetch_and_analyze_job():
     """Job 1: Fetch content from collectors and perform AI analysis."""
     logger.info("--- Collection cycle started ---")
@@ -39,8 +51,7 @@ async def fetch_and_analyze_job():
     # the official one is processed first and the influencer one is marked as a duplicate.
     all_content.sort(key=lambda x: 0 if x.get("source_type") == "OFFICIAL" else 1)
 
-    # Fetch recent relevant items for deduplication
-    recent_relevant = db.get_recent_relevant_items(hours=24)
+    recent_summaries = db.get_recent_sent_summaries(hours=12)
 
     skipped = 0
     analyzed = 0
@@ -50,7 +61,6 @@ async def fetch_and_analyze_job():
     for item in all_content:
         content_id = item.get("id")
         source = item.get("source", "unknown")
-        source_type = item.get("source_type", "unknown")
 
         if not content_id:
             continue
@@ -60,19 +70,6 @@ async def fetch_and_analyze_job():
             continue
 
         canonical_content = media_extractor.extract_media(item)
-        
-        # Deduplication check
-        dup_result = analyzer.find_duplicate(canonical_content.get("text", ""), recent_relevant)
-        if dup_result.get("is_duplicate"):
-            duplicates += 1
-            logger.info(f"Duplicate detected: {content_id} is a duplicate of {dup_result.get('duplicate_id')}. Reason: {dup_result.get('reason')}")
-            
-            # Policy: If we find a duplicate, we skip it.
-            # If the NEW item is OFFICIAL and the existing one is NOT, we could swap them,
-            # but usually official sources post first or we process them first in this loop.
-            # To keep it safe, we mark it as processed but not relevant.
-            db.mark_content_processed(content_id, source, metadata={**canonical_content, "relevant": False, "summary": f"Duplicate of {dup_result.get('duplicate_id')}"})
-            continue
 
         analysis_result = analyzer.analyze(canonical_content)
         if not analysis_result:
@@ -82,13 +79,18 @@ async def fetch_and_analyze_job():
         analyzed += 1
         await asyncio.sleep(2)
 
+        if analysis_result.get("relevant") and _is_duplicate_topic(analysis_result.get("summary", ""), recent_summaries):
+            duplicates += 1
+            analysis_result["relevant"] = False
+            analysis_result["summary"] = "Duplicate topic: " + analysis_result.get("summary", "")
+            logger.info(f"    Duplicate topic skipped: {content_id}")
+
         metadata = {**canonical_content, **analysis_result}
         db.mark_content_processed(content_id, source, metadata=metadata)
 
         if analysis_result.get("relevant"):
             relevant += 1
-            # Add to recent relevant for subsequent items in the same batch
-            recent_relevant.append({"content_id": content_id, "text": canonical_content.get("text", ""), "source_type": source_type})
+            recent_summaries.append(analysis_result.get("summary", ""))
 
     logger.info(
         f"--- Cycle done | Collected: {len(all_content)} | Skipped: {skipped} | Duplicates: {duplicates} | Analyzed: {analyzed} | Relevant: {relevant} ---"
