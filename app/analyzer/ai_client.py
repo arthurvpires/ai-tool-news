@@ -12,6 +12,13 @@ logger = logging.getLogger(__name__)
 T = TypeVar("T", bound=BaseModel)
 
 MAX_RETRIES = 2
+SHORT_LIMIT_MAX_WAIT = 30
+DAILY_LIMIT_THRESHOLD = 120
+
+
+class RateLimitExhausted(Exception):
+    """Raised when rate limit wait time is too long (daily quota hit)."""
+    pass
 
 
 def _extract_wait_seconds(error_msg):
@@ -26,6 +33,19 @@ def _extract_wait_seconds(error_msg):
 
 def _is_rate_limit(e):
     return "429" in str(e) or "rate_limit" in str(e).lower()
+
+
+def _handle_rate_limit(e, provider_name, attempt, max_retries):
+    wait = _extract_wait_seconds(e)
+    if wait > DAILY_LIMIT_THRESHOLD:
+        logger.warning(f"Daily limit hit ({provider_name}). Need to wait {wait/60:.0f}min. Stopping cycle.")
+        raise RateLimitExhausted(f"Daily limit reached for {provider_name}. Retry in {wait/60:.0f}min.")
+    if attempt < max_retries:
+        capped = min(wait, SHORT_LIMIT_MAX_WAIT)
+        logger.warning(f"Rate limit hit ({provider_name}). Waiting {capped:.0f}s...")
+        time.sleep(capped)
+        return True
+    return False
 
 
 class AIClient:
@@ -80,14 +100,14 @@ class AIClient:
                         max_tokens=max_tokens,
                     )
                     return response.choices[0].message.content
+                except RateLimitExhausted:
+                    raise
                 except Exception as e:
-                    if _is_rate_limit(e) and attempt < MAX_RETRIES:
-                        wait = min(_extract_wait_seconds(e), 60)
-                        logger.warning(f"Rate limit hit ({p['name']}). Waiting {wait:.0f}s...")
-                        time.sleep(wait)
-                    else:
-                        logger.warning(f"Provider {p['name']} failed: {e}")
-                        break
+                    if _is_rate_limit(e):
+                        if _handle_rate_limit(e, p["name"], attempt, MAX_RETRIES):
+                            continue
+                    logger.warning(f"Provider {p['name']} failed: {e}")
+                    break
         return None
 
     def parse(self, system_prompt: str, user_prompt: str, response_format: Type[T], max_tokens: int = 500) -> Optional[T]:
@@ -120,12 +140,12 @@ class AIClient:
                         )
                         return response_format.model_validate_json(response.choices[0].message.content)
 
+                except RateLimitExhausted:
+                    raise
                 except Exception as e:
-                    if _is_rate_limit(e) and attempt < MAX_RETRIES:
-                        wait = min(_extract_wait_seconds(e), 60)
-                        logger.warning(f"Rate limit hit ({name}). Waiting {wait:.0f}s...")
-                        time.sleep(wait)
-                    else:
-                        logger.warning(f"Provider {name} parse failed: {e}")
-                        break
+                    if _is_rate_limit(e):
+                        if _handle_rate_limit(e, name, attempt, MAX_RETRIES):
+                            continue
+                    logger.warning(f"Provider {name} parse failed: {e}")
+                    break
         return None

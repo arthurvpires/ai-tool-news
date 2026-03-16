@@ -11,6 +11,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from app.collectors.twitter_collector import TwitterCollector
 from app.media.media_extractor import MediaExtractor
 from app.analyzer.ai_analyzer import AIAnalyzer
+from app.analyzer.ai_client import RateLimitExhausted
 from app.telegram.telegram_sender import TelegramSender
 from app.database import db
 from app.config import settings
@@ -74,6 +75,8 @@ async def fetch_and_analyze_job():
     relevant = 0
     duplicates = 0
 
+    rate_limited = False
+
     for item in all_content:
         content_id = item.get("id")
         source = item.get("source", "unknown")
@@ -87,7 +90,13 @@ async def fetch_and_analyze_job():
 
         canonical_content = media_extractor.extract_media(item)
 
-        analysis_result = analyzer.analyze(canonical_content)
+        try:
+            analysis_result = analyzer.analyze(canonical_content)
+        except RateLimitExhausted as e:
+            logger.warning(f"Stopping cycle: {e}")
+            rate_limited = True
+            break
+
         if not analysis_result:
             logger.warning(f"Analysis failed for {content_id}. Skipping.")
             continue
@@ -117,8 +126,9 @@ async def fetch_and_analyze_job():
             recent_summaries.append(analysis_result.get("summary", ""))
             recent_relevant.append({"content_id": content_id, "text": canonical_content.get("text", "")})
 
+    status = "PAUSED (rate limit)" if rate_limited else "done"
     logger.info(
-        f"--- Cycle done | Collected: {len(all_content)} | Skipped: {skipped} | Duplicates: {duplicates} | Analyzed: {analyzed} | Relevant: {relevant} ---"
+        f"--- Cycle {status} | Collected: {len(all_content)} | Skipped: {skipped} | Duplicates: {duplicates} | Analyzed: {analyzed} | Relevant: {relevant} ---"
     )
 
 

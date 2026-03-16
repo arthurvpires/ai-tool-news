@@ -54,6 +54,7 @@ class AIAnalyzer:
         if not text:
             return {"relevant": False, "summary": "No text content", "relevance_score": 0}
 
+        from app.analyzer.ai_client import RateLimitExhausted
         try:
             result = self.ai_client.parse(
                 system_prompt=self.system_prompt,
@@ -71,6 +72,8 @@ class AIAnalyzer:
                     "summary": result.reason,
                     "category": result.category,
                 }
+        except RateLimitExhausted:
+            raise
         except Exception as e:
             logger.error(f"AI analysis failed for {content_id}: {e}")
 
