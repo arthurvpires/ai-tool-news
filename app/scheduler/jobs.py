@@ -18,9 +18,19 @@ from app.config import settings
 
 logger = logging.getLogger(__name__)
 
+_rate_limit_until = None
+
 
 async def fetch_and_analyze_job():
     """Job 1: Fetch content from collectors and perform AI analysis."""
+    global _rate_limit_until
+
+    if _rate_limit_until and datetime.now(timezone.utc) < _rate_limit_until:
+        remaining = (_rate_limit_until - datetime.now(timezone.utc)).total_seconds() / 60
+        logger.info(f"--- Cycle skipped (rate limit cooldown, {remaining:.0f}min remaining) ---")
+        return
+
+    _rate_limit_until = None
     logger.info("--- Collection cycle started ---")
 
     collectors = [TwitterCollector()]
@@ -61,7 +71,11 @@ async def fetch_and_analyze_job():
         try:
             analysis_result = analyzer.analyze(canonical_content)
         except RateLimitExhausted as e:
-            logger.warning(f"Stopping cycle: {e}")
+            import re
+            mins = re.search(r"Retry in (\d+)min", str(e))
+            cooldown = int(mins.group(1)) + 2 if mins else 15
+            _rate_limit_until = datetime.now(timezone.utc) + timedelta(minutes=cooldown)
+            logger.warning(f"Stopping cycle: {e} (cooldown {cooldown}min)")
             rate_limited = True
             break
 

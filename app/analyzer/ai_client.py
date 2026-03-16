@@ -44,7 +44,7 @@ def _handle_rate_limit(e, provider_name, attempt, max_retries):
         logger.warning(f"Rate limit hit ({provider_name}). Waiting {capped:.0f}s...")
         time.sleep(capped)
         return True
-    return False
+    raise RateLimitExhausted(f"Rate limit retries exhausted for {provider_name}. Wait ~{wait:.0f}s.")
 
 
 class AIClient:
