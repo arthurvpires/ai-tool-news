@@ -237,7 +237,10 @@ async def send_daily_summary_job():
 def setup_scheduler() -> AsyncIOScheduler:
     scheduler = AsyncIOScheduler()
 
-    # Job 1: Collect and analyze
+    if not settings.ENABLE_SCHEDULER:
+        logger.info("All scheduled jobs DISABLED (ENABLE_SCHEDULER=false)")
+        return scheduler
+
     scheduler.add_job(
         fetch_and_analyze_job,
         "interval",
@@ -246,7 +249,6 @@ def setup_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
-    # Job 2: Send pending items to Telegram (8h–20h BRT only)
     scheduler.add_job(
         send_pending_to_telegram_job,
         "interval",
@@ -256,7 +258,6 @@ def setup_scheduler() -> AsyncIOScheduler:
         misfire_grace_time=120,
     )
 
-    # Job 3: Cleanup old irrelevant records (daily at 00:00 BRT)
     scheduler.add_job(
         cleanup_old_records_job,
         "cron",
@@ -266,8 +267,6 @@ def setup_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
-
-    # Job 5: Daily Summary (Saturday and Sunday at 20:00 BRT)
     scheduler.add_job(
         send_daily_summary_job,
         "cron",

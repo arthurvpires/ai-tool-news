@@ -15,6 +15,9 @@ class Settings(BaseSettings):
     SUPABASE_URL: str = "https://your-project.supabase.co"
     SUPABASE_SERVICE_KEY: str = "your_service_role_key"
 
+    # Feature Toggle
+    ENABLE_SCHEDULER: bool = Field(default=True)
+
     # App Config
     SCHEDULER_SEARCHING_TWEETS_MINUTES: int = Field(default=5)
     SCHEDULER_TELEGRAM_SENDING_MINUTES: int = Field(default=1)
