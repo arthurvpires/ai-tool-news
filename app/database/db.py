@@ -105,6 +105,19 @@ def update_is_relevant(content_id, is_relevant):
     ).eq("content_id", content_id).execute()
 
 
+def get_recent_sent_summaries(hours=12):
+    cutoff = (datetime.utcnow() - timedelta(hours=hours)).isoformat()
+    result = (
+        supabase.table(TABLE)
+        .select("analysis_summary")
+        .eq("is_relevant", True)
+        .not_.is_("sent_at", "null")
+        .gte("timestamp", cutoff)
+        .execute()
+    )
+    return [r["analysis_summary"] for r in result.data if r.get("analysis_summary")]
+
+
 def get_total_count():
     result = (
         supabase.table(TABLE)

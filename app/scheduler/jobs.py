@@ -18,16 +18,34 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 
-def _is_duplicate_topic(summary, sent_summaries):
+def _word_overlap(summary, sent_summaries):
+    """Fast word-matching check. Returns overlap ratio of best match."""
     if not summary or not sent_summaries:
-        return False
+        return 0.0
     words = set(summary.lower().split())
+    best = 0.0
     for sent in sent_summaries:
         sent_words = set(sent.lower().split())
         common = words & sent_words
-        if len(common) >= 3 and len(common) / max(len(words), len(sent_words)) > 0.4:
-            return True
-    return False
+        if len(common) >= 3:
+            ratio = len(common) / max(len(words), len(sent_words))
+            best = max(best, ratio)
+    return best
+
+
+def _check_duplicate(analyzer, text, summary, recent_relevant, recent_summaries):
+    """Two-tier dedup: word-matching first, AI dedup only if borderline."""
+    overlap = _word_overlap(summary, recent_summaries)
+
+    if overlap > 0.5:
+        return True, "word-match"
+
+    if overlap > 0.25 and recent_relevant:
+        dup_result = analyzer.find_duplicate(text, recent_relevant[:1])
+        if dup_result.get("is_duplicate") and dup_result.get("confidence", 0) > 0.7:
+            return True, f"AI-confirmed (vs {dup_result.get('duplicate_id', '?')})"
+
+    return False, None
 
 
 async def fetch_and_analyze_job():
@@ -46,12 +64,10 @@ async def fetch_and_analyze_job():
         except Exception as e:
             logger.error(f"Collector {collector.__class__.__name__} failed: {e}")
 
-    # Sort content so OFFICIAL sources are processed first
-    # This ensures that if both an official source and an influencer are in the same batch,
-    # the official one is processed first and the influencer one is marked as a duplicate.
     all_content.sort(key=lambda x: 0 if x.get("source_type") == "OFFICIAL" else 1)
 
     recent_summaries = db.get_recent_sent_summaries(hours=12)
+    recent_relevant = db.get_recent_relevant_items(hours=24)
 
     skipped = 0
     analyzed = 0
@@ -79,11 +95,19 @@ async def fetch_and_analyze_job():
         analyzed += 1
         await asyncio.sleep(2)
 
-        if analysis_result.get("relevant") and _is_duplicate_topic(analysis_result.get("summary", ""), recent_summaries):
-            duplicates += 1
-            analysis_result["relevant"] = False
-            analysis_result["summary"] = "Duplicate topic: " + analysis_result.get("summary", "")
-            logger.info(f"    Duplicate topic skipped: {content_id}")
+        if analysis_result.get("relevant"):
+            is_dup, reason = _check_duplicate(
+                analyzer,
+                canonical_content.get("text", ""),
+                analysis_result.get("summary", ""),
+                recent_relevant,
+                recent_summaries,
+            )
+            if is_dup:
+                duplicates += 1
+                analysis_result["relevant"] = False
+                analysis_result["summary"] = f"Duplicate ({reason}): " + analysis_result.get("summary", "")
+                logger.info(f"    Duplicate skipped ({reason}): {content_id}")
 
         metadata = {**canonical_content, **analysis_result}
         db.mark_content_processed(content_id, source, metadata=metadata)
@@ -91,6 +115,7 @@ async def fetch_and_analyze_job():
         if analysis_result.get("relevant"):
             relevant += 1
             recent_summaries.append(analysis_result.get("summary", ""))
+            recent_relevant.append({"content_id": content_id, "text": canonical_content.get("text", "")})
 
     logger.info(
         f"--- Cycle done | Collected: {len(all_content)} | Skipped: {skipped} | Duplicates: {duplicates} | Analyzed: {analyzed} | Relevant: {relevant} ---"
@@ -155,10 +180,6 @@ async def cleanup_old_records_job():
         deleted = db.delete_old_irrelevant_records(days=settings.DB_CLEANUP_INTERVAL_DAYS)
         if deleted:
             logger.info(f"Cleanup: removed {deleted} old irrelevant record(s).")
-    except Exception as e:
-        logger.error(f"Cleanup job failed: {e}")
-
-
     except Exception as e:
         logger.error(f"Cleanup job failed: {e}")
 
