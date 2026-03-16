@@ -7,12 +7,6 @@ from app.analyzer.ai_client import AIClient
 
 logger = logging.getLogger(__name__)
 
-GROQ_MODELS = [
-    "llama-3.1-8b-instant",
-    "llama-3.3-70b-versatile",
-]
-
-
 MIN_RELEVANT_SCORE = 5
 
 
