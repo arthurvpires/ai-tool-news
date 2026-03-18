@@ -68,13 +68,19 @@ async def lifespan(app: FastAPI):
     scheduler.start()
     logger.info("Scheduler started.")
 
-    # Run once immediately on startup alongside the interval
+    # Run once after a short delay to ensure the server binds to the port first
     try:
         import asyncio
 
-        asyncio.create_task(fetch_and_analyze_job())
+        async def run_after_startup():
+            await asyncio.sleep(10)  # Wait for Uvicorn to bind to the port
+            logger.info("Starting initial background collection job...")
+            await fetch_and_analyze_job()
+
+        asyncio.create_task(run_after_startup())
     except Exception as e:
-        logger.error(f"Error running initial job: {e}")
+        logger.error(f"Error scheduling initial job: {e}")
+
 
     yield
     # Teardown on shutdown
