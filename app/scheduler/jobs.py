@@ -5,7 +5,7 @@ from datetime import datetime, timezone, timedelta
 
 BRT = timezone(timedelta(hours=-3))
 SEND_HOUR_START = 8
-SEND_HOUR_END_WEEKDAY = 19
+SEND_HOUR_END_WEEKDAY = 22
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.collectors.twitter_collector import TwitterCollector
@@ -100,15 +100,20 @@ async def fetch_and_analyze_job():
 async def send_pending_to_telegram_job():
     """Job 2: Send the single most relevant pending item to Telegram (08h–22h BRT only)."""
     now_brt = datetime.now(BRT)
-    is_weekend = now_brt.strftime("%A") in ["Saturday", "Sunday"]
+    now_utc = datetime.now(timezone.utc)
+    
+    logger.debug(f"Send job triggered | BRT: {now_brt.strftime('%Y-%m-%d %H:%M:%S')} | UTC: {now_utc.strftime('%H:%M:%S')}")
+
+    is_weekend = now_brt.weekday() >= 5  # 5: Saturday, 6: Sunday
 
     if is_weekend:
-        logger.debug("It's weekend. Skipping regular Telegram updates. Consolidated summary will be sent at 20:00.")
+        logger.debug(f"Weekend skip | Day: {now_brt.strftime('%A')} | UTC: {now_utc.strftime('%H:%M:%S')}")
         return
 
-    # Weekdays: 8am to 19pm
-    if not (SEND_HOUR_START <= now_brt.hour < SEND_HOUR_END_WEEKDAY):
-        logger.debug(f"Outside weekday send window ({now_brt.strftime('%H:%M')} BRT). Skipping.")
+    # Window: 8am to 22pm (inclusive of 21:59)
+    in_window = (SEND_HOUR_START <= now_brt.hour < SEND_HOUR_END_WEEKDAY)
+    if not in_window:
+        logger.debug(f"Window skip | Hour: {now_brt.hour} BRT (Window: {SEND_HOUR_START}-{SEND_HOUR_END_WEEKDAY})")
         return
 
     telegram_sender = TelegramSender()
@@ -121,7 +126,7 @@ async def send_pending_to_telegram_job():
     top_item = pending_items[0]
 
     logger.info(
-        f"Sending to Telegram ({len(pending_items)} pending) | {top_item['company']} | Score: {top_item['relevance_score']} | {top_item['content_id']}"
+        f"SENDING... | {top_item['company']} | Score: {top_item['relevance_score']} | Time: {now_brt.strftime('%H:%M')} BRT"
     )
 
     try:
@@ -139,6 +144,7 @@ async def send_pending_to_telegram_job():
             "summary": top_item["analysis_summary"],
             "category": top_item["analysis_category"],
         }
+
 
         await telegram_sender.send_update(content, analysis)
 
@@ -200,7 +206,7 @@ async def send_daily_summary_job():
 
 
 def setup_scheduler() -> AsyncIOScheduler:
-    scheduler = AsyncIOScheduler()
+    scheduler = AsyncIOScheduler(timezone=BRT)
 
     if not settings.ENABLE_SCHEDULER:
         logger.info("All scheduled jobs DISABLED (ENABLE_SCHEDULER=false)")
