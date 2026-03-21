@@ -4,8 +4,6 @@ import asyncio
 from datetime import datetime, timezone, timedelta
 
 BRT = timezone(timedelta(hours=-3))
-SEND_HOUR_START = 8
-SEND_HOUR_END_WEEKDAY = 22
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 
 from app.collectors.twitter_collector import TwitterCollector
@@ -19,6 +17,18 @@ from app.config import settings
 logger = logging.getLogger(__name__)
 
 _rate_limit_until = None
+
+def get_window_label() -> str:
+    """Return the current BRT date and time as the digest label."""
+    now_brt = datetime.now(BRT)
+    return now_brt.strftime("%d/%m/%Y %H:%M")
+
+# Window cron definitions (hour, minute in BRT)
+WINDOW_CRONS = [
+    {"hour": 11, "minute": 30},
+    {"hour": 17, "minute": 0},
+    {"hour": 20, "minute": 0},
+]
 
 
 async def fetch_and_analyze_job():
@@ -50,7 +60,6 @@ async def fetch_and_analyze_job():
     skipped = 0
     analyzed = 0
     relevant = 0
-
     rate_limited = False
 
     for item in all_content:
@@ -85,7 +94,11 @@ async def fetch_and_analyze_job():
 
         analyzed += 1
 
+        # Persist source_type so deduplication can use it later
         metadata = {**canonical_content, **analysis_result}
+        if item.get("source_type"):
+            metadata["source_type"] = item["source_type"]
+
         db.mark_content_processed(content_id, source, metadata=metadata)
 
         if analysis_result.get("relevant"):
@@ -97,112 +110,67 @@ async def fetch_and_analyze_job():
     )
 
 
-async def send_pending_to_telegram_job():
-    """Job 2: Send the single most relevant pending item to Telegram (08h–22h BRT only)."""
+async def send_window_digest_job():
+    """
+    Job 2: Build and send a curated digest for the current time window.
+    - Checks backlog of all unsent relevant items.
+    - If fewer than MIN_ITEMS_TO_SEND items → skip (carry to next window).
+    - Deduplicates with LLM, ranks, selects top 10, generates digest, sends.
+    """
     now_brt = datetime.now(BRT)
-    now_utc = datetime.now(timezone.utc)
-    
-    logger.debug(f"Send job triggered | BRT: {now_brt.strftime('%Y-%m-%d %H:%M:%S')} | UTC: {now_utc.strftime('%H:%M:%S')}")
-
-    is_weekend = now_brt.weekday() >= 5  # 5: Saturday, 6: Sunday
-
-    if is_weekend:
-        logger.debug(f"Weekend skip | Day: {now_brt.strftime('%A')} | UTC: {now_utc.strftime('%H:%M:%S')}")
-        return
-
-    # Window: 8am to 22pm (inclusive of 21:59)
-    in_window = (SEND_HOUR_START <= now_brt.hour < SEND_HOUR_END_WEEKDAY)
-    if not in_window:
-        logger.debug(f"Window skip | Hour: {now_brt.hour} BRT (Window: {SEND_HOUR_START}-{SEND_HOUR_END_WEEKDAY})")
-        return
-
-    telegram_sender = TelegramSender()
+    window_label = get_window_label()
+    logger.info(f"--- Digest job triggered | {window_label} BRT ---")
 
     pending_items = db.get_pending_items()
+    total_pending = len(pending_items)
 
-    if not pending_items:
+    if total_pending < settings.MIN_ITEMS_TO_SEND:
+        logger.info(
+            f"Backlog too small ({total_pending} items, minimum {settings.MIN_ITEMS_TO_SEND}). "
+            "Skipping — items carried to next window."
+        )
         return
 
-    top_item = pending_items[0]
+    logger.info(f"Processing {total_pending} pending items for digest...")
 
-    logger.info(
-        f"SENDING... | {top_item['company']} | Score: {top_item['relevance_score']} | Time: {now_brt.strftime('%H:%M')} BRT"
-    )
+    analyzer = AIAnalyzer()
 
+    # Step 1: LLM deduplication
+    deduped = analyzer.deduplicate(pending_items)
+
+    # Step 2: Rank and select top 10
+    selected = analyzer.rank_and_select(deduped, top_n=10)
+    logger.info(f"Selected {len(selected)} items after deduplication + ranking")
+
+    # Step 3: Generate digest text
+    digest_text = analyzer.generate_digest(selected, window_label=window_label)
+    if not digest_text:
+        logger.error("Digest generation returned empty text. Aborting send.")
+        return
+
+    # Step 4: Send to Telegram
+    telegram_sender = TelegramSender()
     try:
-        content = {
-            "id": top_item["content_id"],
-            "source": top_item["source"],
-            "text": top_item["text"],
-            "company": top_item["company"],
-            "url": top_item["url"],
-            "images": json.loads(top_item["images_json"]) if top_item.get("images_json") else [],
-            "video": top_item["video"],
-        }
-        analysis = {
-            "relevant": True,
-            "summary": top_item["analysis_summary"],
-            "category": top_item["analysis_category"],
-        }
-
-
-        await telegram_sender.send_update(content, analysis)
-
-        db.mark_item_sent(top_item["content_id"])
-        logger.info(f"Sent OK: {top_item['content_id']}")
-
+        await telegram_sender.send_digest(digest_text)
+        logger.info("Digest sent successfully.")
     except Exception as e:
-        logger.error(f"Send FAILED: {top_item['content_id']} | {e}")
+        logger.error(f"Failed to send digest: {e}")
+        return
+
+    # Step 5: Mark all selected items as sent
+    sent_ids = [item["content_id"] for item in selected]
+    db.mark_items_sent(sent_ids)
+    logger.info(f"Marked {len(sent_ids)} items as sent.")
 
 
 async def cleanup_old_records_job():
-    """Job 3: Delete non-relevant records older than 24h to keep the DB clean."""
+    """Job 3: Delete non-relevant records older than N days to keep the DB clean."""
     try:
         deleted = db.delete_old_irrelevant_records(days=settings.DB_CLEANUP_INTERVAL_DAYS)
         if deleted:
             logger.info(f"Cleanup: removed {deleted} old irrelevant record(s).")
     except Exception as e:
         logger.error(f"Cleanup job failed: {e}")
-
-
-async def send_daily_summary_job():
-    """Job 5: Generate and send a daily AI summary every Sat/Sun at 20:00 BRT."""
-    logger.info("--- Generating Daily AI Summary (Weekend Window) ---")
-    
-    now_brt = datetime.now(BRT)
-    # Window: 00:00 to 19:55 BRT of today
-    today_start_brt = now_brt.replace(hour=0, minute=0, second=0, microsecond=0)
-    today_start_utc = today_start_brt.astimezone(timezone.utc)
-    
-    # Fetch items since start of today BRT
-    recent_items = db.get_relevant_items_since(today_start_utc.isoformat())
-    
-    if not recent_items:
-        logger.info("No relevant items found since 00:00 BRT today.")
-        return
-
-    # Filter to only include VERY RELEVANT (e.g., score >= 7)
-    very_relevant = [item for item in recent_items if item.get("relevance_score", 0) >= 7]
-    
-    analyzer = AIAnalyzer()
-    summary_content = analyzer.generate_daily_summary(very_relevant if very_relevant else recent_items)
-
-    telegram_sender = TelegramSender()
-    try:
-        await telegram_sender.bot.send_message(
-            chat_id=settings.TELEGRAM_CHAT_ID,
-            text=summary_content,
-            parse_mode="Markdown"
-        )
-        logger.info("Daily summary sent successfully.")
-
-        # Mark all items from today as sent so they aren't resent individually on Monday
-        for item in recent_items:
-            db.mark_item_sent(item["content_id"])
-        logger.info(f"Marked {len(recent_items)} items as sent.")
-
-    except Exception as e:
-        logger.error(f"Failed to send daily summary: {e}")
 
 
 def setup_scheduler() -> AsyncIOScheduler:
@@ -212,6 +180,7 @@ def setup_scheduler() -> AsyncIOScheduler:
         logger.info("All scheduled jobs DISABLED (ENABLE_SCHEDULER=false)")
         return scheduler
 
+    # Job 1 — continuous collection
     scheduler.add_job(
         fetch_and_analyze_job,
         "interval",
@@ -220,31 +189,31 @@ def setup_scheduler() -> AsyncIOScheduler:
         replace_existing=True,
     )
 
-    scheduler.add_job(
-        send_pending_to_telegram_job,
-        "interval",
-        minutes=settings.SCHEDULER_TELEGRAM_SENDING_MINUTES,
-        id="send_to_telegram_job",
-        replace_existing=True,
-        misfire_grace_time=120,
-    )
+    # Job 2 — three daily digest windows (BRT)
+    windows = [
+        {"hour": 11, "minute": 30},
+        {"hour": 17, "minute": 0},
+        {"hour": 20, "minute": 0},
+    ]
+    for w in windows:
+        scheduler.add_job(
+            send_window_digest_job,
+            "cron",
+            hour=w["hour"],
+            minute=w["minute"],
+            id=f"digest_{w['hour']}h{w['minute']:02d}",
+            replace_existing=True,
+            misfire_grace_time=300,
+        )
+        logger.info(f"Scheduled digest window: {w['hour']:02d}:{w['minute']:02d} BRT")
 
+    # Job 3 — nightly cleanup
     scheduler.add_job(
         cleanup_old_records_job,
         "cron",
         hour=3,
         minute=0,
         id="cleanup_old_records_job",
-        replace_existing=True,
-    )
-
-    scheduler.add_job(
-        send_daily_summary_job,
-        "cron",
-        day_of_week="sat,sun",
-        hour=20,
-        minute=0,
-        id="daily_summary_job",
         replace_existing=True,
     )
 

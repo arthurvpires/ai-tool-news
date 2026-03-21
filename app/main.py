@@ -5,7 +5,7 @@ from fastapi import FastAPI, BackgroundTasks
 from contextlib import asynccontextmanager
 
 from app.database import db
-from app.scheduler.jobs import setup_scheduler, fetch_and_analyze_job
+from app.scheduler.jobs import setup_scheduler, fetch_and_analyze_job, send_window_digest_job
 
 os.makedirs("logs", exist_ok=True)
 
@@ -95,16 +95,3 @@ app = FastAPI(title="AI News Bot API", lifespan=lifespan)
 def health_check():
     return {"status": "ok", "scheduler_running": scheduler.state == 1}
 
-
-@app.post("/run-collector")
-async def manual_run_collector(background_tasks: BackgroundTasks):
-    """Manually trigger the collection and dispatch process in the background."""
-    background_tasks.add_task(fetch_and_analyze_job)
-    return {"message": "Collector job started in the background."}
-
-
-@app.get("/stats")
-def get_stats():
-    """Return some basic system stats."""
-    total_processed = db.get_total_count()
-    return {"total_processed": total_processed}

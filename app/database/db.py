@@ -45,6 +45,8 @@ def mark_content_processed(content_id, source, metadata=None):
         row["video"] = metadata.get("video")
         row["analysis_summary"] = metadata.get("summary")
         row["analysis_category"] = metadata.get("category")
+        if metadata.get("source_type"):
+            row["source_type"] = metadata.get("source_type")
 
     supabase.table(TABLE).insert(row).execute()
 
@@ -66,6 +68,15 @@ def mark_item_sent(content_id):
     supabase.table(TABLE).update(
         {"sent_at": datetime.utcnow().isoformat()}
     ).eq("content_id", content_id).execute()
+
+
+def mark_items_sent(content_ids: list):
+    """Bulk-mark a list of content_ids as sent."""
+    if not content_ids:
+        return
+    now = datetime.utcnow().isoformat()
+    for cid in content_ids:
+        supabase.table(TABLE).update({"sent_at": now}).eq("content_id", cid).execute()
 
 
 def delete_old_irrelevant_records(days: int = 2) -> int:

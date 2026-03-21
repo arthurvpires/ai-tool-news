@@ -31,6 +31,10 @@ def _is_rate_limit(e):
 GROQ_MODELS = [
     "llama-3.3-70b-versatile",
     "llama-3.1-8b-instant",
+    'qwen/qwen3-32b',
+    'openai/gpt-oss-120b',
+    'allam-2-7b',
+    'meta-llama/llama-prompt-guard-2-22m'
 ]
 
 
@@ -56,7 +60,6 @@ class AIClient:
                     "model": model,
                     "type": "groq",
                 })
-            logger.info(f"Groq provider initialized with {len(GROQ_MODELS)} models.")
 
         if not self.providers:
             logger.warning("No valid OpenAI or Groq API key found.")

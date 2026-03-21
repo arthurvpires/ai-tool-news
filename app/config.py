@@ -20,8 +20,8 @@ class Settings(BaseSettings):
 
     # App Config
     SCHEDULER_SEARCHING_TWEETS_MINUTES: int = Field(default=5)
-    SCHEDULER_TELEGRAM_SENDING_MINUTES: int = Field(default=1)
     DB_CLEANUP_INTERVAL_DAYS: int = Field(default=2)
+    MIN_ITEMS_TO_SEND: int = Field(default=3)
 
     class Config:
         env_file = ".env"

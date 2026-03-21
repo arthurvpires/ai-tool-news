@@ -180,3 +180,39 @@ class TelegramSender:
         except Exception as bot_err:
             logger.error(f"Telegram Bot Session Error: {bot_err}")
             raise bot_err
+
+    async def send_digest(self, text: str):
+        """Send a curated digest as a single Markdown message."""
+        if not self.bot:
+            logger.warning("No TELEGRAM_BOT_TOKEN found. Digest send skipped.")
+            logger.debug(f"Digest content:\n{text}")
+            return
+
+        MAX_RETRIES = 3
+        RETRY_DELAY = 5
+
+        try:
+            async with self.bot:
+                for attempt in range(MAX_RETRIES):
+                    try:
+                        await self.bot.send_message(
+                            chat_id=self.chat_id,
+                            text=text,
+                            parse_mode="Markdown",
+                            disable_web_page_preview=True,
+                            read_timeout=60,
+                            write_timeout=60,
+                            connect_timeout=30,
+                        )
+                        logger.info("Digest message sent successfully.")
+                        return
+                    except Exception as e:
+                        logger.error(f"Digest send attempt {attempt + 1} failed: {e}")
+                        if attempt < MAX_RETRIES - 1:
+                            import asyncio
+                            await asyncio.sleep(RETRY_DELAY)
+                        else:
+                            raise
+        except Exception as bot_err:
+            logger.error(f"Telegram Bot Session Error (digest): {bot_err}")
+            raise bot_err
