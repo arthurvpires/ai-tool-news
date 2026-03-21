@@ -69,8 +69,12 @@ async def fetch_and_analyze_job():
         if not content_id:
             continue
 
-        if db.is_content_processed(content_id):
-            skipped += 1
+        try:
+            if db.is_content_processed(content_id):
+                skipped += 1
+                continue
+        except Exception as e:
+            logger.error(f"DB error checking if processed {content_id}: {e}")
             continue
 
         canonical_content = media_extractor.extract_media(item)
@@ -99,7 +103,10 @@ async def fetch_and_analyze_job():
         if item.get("source_type"):
             metadata["source_type"] = item["source_type"]
 
-        db.mark_content_processed(content_id, source, metadata=metadata)
+        try:
+            db.mark_content_processed(content_id, source, metadata=metadata)
+        except Exception as e:
+            logger.error(f"DB error marking {content_id} as processed: {e}")
 
         if analysis_result.get("relevant"):
             relevant += 1
