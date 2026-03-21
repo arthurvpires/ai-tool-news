@@ -142,11 +142,11 @@ class AIAnalyzer:
             has_video = bool(item.get("video"))
             has_images = bool(item.get("images_json") or item.get("images"))
             if has_video:
-                media_tag = f"[🎥]({url})" if url else "🎥"
+                media_tag = f"🎥 [See video on X]({url})" if url else "🎥"
             elif has_images:
-                media_tag = f"[📷]({url})" if url else "📷"
+                media_tag = f"📷 [See photo on X]({url})" if url else "📷"
             else:
-                media_tag = f"[🔗 See in X]({url})" if url else ""
+                media_tag = f"[See on X]({url})" if url else ""
 
             tag_part = f" {media_tag}" if media_tag else ""
             news_list += f"- [{company}] {summary} (Score: {score}){tag_part}\n"

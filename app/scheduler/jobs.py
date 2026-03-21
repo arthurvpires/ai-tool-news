@@ -145,6 +145,13 @@ async def send_window_digest_job():
     # Step 1: LLM deduplication
     deduped = analyzer.deduplicate(pending_items)
 
+    if len(deduped) < settings.MIN_ITEMS_TO_SEND:
+        logger.info(
+            f"Not enough unique items after deduplication ({len(deduped)} items, minimum {settings.MIN_ITEMS_TO_SEND}). "
+            "Skipping — items carried to next window."
+        )
+        return
+
     # Step 2: Rank and select top 10
     selected = analyzer.rank_and_select(deduped, top_n=10)
     logger.info(f"Selected {len(selected)} items after deduplication + ranking")
@@ -164,10 +171,16 @@ async def send_window_digest_job():
         logger.error(f"Failed to send digest: {e}")
         return
 
-    # Step 5: Mark all selected items as sent
+    # Step 5: Mark all selected items and duplicates as sent (to discard them)
     sent_ids = [item["content_id"] for item in selected]
-    db.mark_items_sent(sent_ids)
-    logger.info(f"Marked {len(sent_ids)} items as sent.")
+    
+    deduped_ids = {item["content_id"] for item in deduped}
+    duplicate_ids = [item["content_id"] for item in pending_items if item["content_id"] not in deduped_ids]
+    
+    all_to_mark = sent_ids + duplicate_ids
+    if all_to_mark:
+        db.mark_items_sent(all_to_mark)
+        logger.info(f"Marked {len(sent_ids)} items as sent and {len(duplicate_ids)} duplicates as discarded.")
 
 
 async def cleanup_old_records_job():

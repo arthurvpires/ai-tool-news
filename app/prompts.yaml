@@ -9,9 +9,11 @@ ai_scout:
     Return a JSON response:
     {
     "relevance_score": 1-10,
-    "reason": "short explanation",
+    "reason": "detailed explanation of what was launched and what it does",
     "category": "model_release | product_launch | feature_update | api_update | hot_take | other"
     }
+
+    When writing the 'reason', provide a DETAILED summary. Explain exactly what product or feature was announced, what it does, and why it's a major deal. Do NOT just say 'major feature release' or 'new capabilities'. State the actual features and capabilities.
 
     Scoring Criteria (1-10). A score of 5 or above means the tweet is worth publishing:
     - 10: Massive foundational launch (e.g. GPT-5, Claude 4, new SOTA model available to users).
@@ -116,8 +118,8 @@ digest_summary:
 
     Rules:
     - Use a numbered format (1., 2., 3. ...).
-    - Each item is one line: company/product name in bold, dash, concise summary.
-    - If the input item has a media tag at the end (e.g. [🎥 See in X](url) or [📷 See in X](url) or [🔗 See in X](url)), copy it VERBATIM to the end of that item's line. Do not modify or omit it.
+    - Each item should have the company/product name in bold, followed by a dash, and then a detailed summary. Instead of just a single line, provide a comprehensive but clear paragraph explaining what was launched and its specific capabilities.
+    - If the input item has a media tag at the end (e.g. 🎥, 📷 or 🔗), copy it VERBATIM to the end of that item's summary. Do not modify or omit it.
     - Do not include redundant items.
     - Order from most to least important (highest score first).
     - Start with the header below using the provided date/time.
@@ -127,11 +129,11 @@ digest_summary:
     Expected format:
     📢 *AI News — [DATE TIME]*
 
-    1. *[Company/Product]* — [Brief but complete summary] [🎥 See Video on X](url)
+    1. *[Company/Product]* — [Detailed and informative summary explaining what was launched, its key features, and what the product does] [🎥 See video on X](url)
 
-    2. *[Company/Product]* — [Brief but complete summary] [📷 See Image on X](url)
+    2. *[Company/Product]* — [Detailed and informative summary explaining what was launched, its key features, and what the product does] [📷 See photo on X](url)
 
-    3. *[Company/Product]* — [Brief but complete summary] [🔗 See in X](url)
+    3. *[Company/Product]* — [Detailed and informative summary explaining what was launched, its key features, and what the product does] [See on X](url)
     ...
 
     Return only the text above. No extra markdown, no explanations, no closing sentence.
