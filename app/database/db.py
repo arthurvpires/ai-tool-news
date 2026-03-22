@@ -79,6 +79,14 @@ def mark_items_sent(content_ids: list):
         supabase.table(TABLE).update({"sent_at": now}).eq("content_id", cid).execute()
 
 
+def mark_items_irrelevant(content_ids: list):
+    """Bulk-mark a list of content_ids as not relevant."""
+    if not content_ids:
+        return
+    for cid in content_ids:
+        supabase.table(TABLE).update({"is_relevant": False}).eq("content_id", cid).execute()
+
+
 def delete_old_irrelevant_records(days: int = 2) -> int:
     """Delete non-relevant records older than `days` days. Returns number of deleted rows."""
     cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()

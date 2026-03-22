@@ -145,7 +145,14 @@ async def send_window_digest_job():
     # Step 1: LLM deduplication
     deduped = analyzer.deduplicate(pending_items)
 
+    deduped_ids = {item.get("content_id") for item in deduped if item.get("content_id")}
+    duplicate_ids = [item.get("content_id") for item in pending_items if item.get("content_id") and item.get("content_id") not in deduped_ids]
+
     if len(deduped) < settings.MIN_ITEMS_TO_SEND:
+        if duplicate_ids:
+            db.mark_items_irrelevant(duplicate_ids)
+            logger.info(f"Marked {len(duplicate_ids)} duplicates as irrelevant before skipping.")
+            
         logger.info(
             f"Not enough unique items after deduplication ({len(deduped)} items, minimum {settings.MIN_ITEMS_TO_SEND}). "
             "Skipping — items carried to next window."
@@ -171,16 +178,19 @@ async def send_window_digest_job():
         logger.error(f"Failed to send digest: {e}")
         return
 
-    # Step 5: Mark all selected items and duplicates as sent (to discard them)
+    # Step 5: Mark selected items as sent, and duplicates as irrelevant
     sent_ids = [item["content_id"] for item in selected]
     
     deduped_ids = {item["content_id"] for item in deduped}
     duplicate_ids = [item["content_id"] for item in pending_items if item["content_id"] not in deduped_ids]
     
-    all_to_mark = sent_ids + duplicate_ids
-    if all_to_mark:
-        db.mark_items_sent(all_to_mark)
-        logger.info(f"Marked {len(sent_ids)} items as sent and {len(duplicate_ids)} duplicates as discarded.")
+    if sent_ids:
+        db.mark_items_sent(sent_ids)
+        logger.info(f"Marked {len(sent_ids)} items as sent.")
+        
+    if duplicate_ids:
+        db.mark_items_irrelevant(duplicate_ids)
+        logger.info(f"Marked {len(duplicate_ids)} duplicates as irrelevant (discarded).")
 
 
 async def cleanup_old_records_job():
