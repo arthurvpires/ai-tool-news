@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 from supabase import create_client
 from app.config import settings
+from app.utils.tz import BRT
 import logging
 import json
 
@@ -28,6 +29,7 @@ def mark_content_processed(content_id, source, metadata=None):
     row = {
         "content_id": content_id,
         "source": source,
+        "timestamp": datetime.now(BRT).isoformat(),
     }
 
     if metadata:
@@ -66,7 +68,7 @@ def get_pending_items():
 
 def mark_item_sent(content_id):
     supabase.table(TABLE).update(
-        {"sent_at": datetime.utcnow().isoformat()}
+        {"sent_at": datetime.now(BRT).isoformat()}
     ).eq("content_id", content_id).execute()
 
 
@@ -74,7 +76,7 @@ def mark_items_sent(content_ids: list):
     """Bulk-mark a list of content_ids as sent."""
     if not content_ids:
         return
-    now = datetime.utcnow().isoformat()
+    now = datetime.now(BRT).isoformat()
     for cid in content_ids:
         supabase.table(TABLE).update({"sent_at": now}).eq("content_id", cid).execute()
 
@@ -89,7 +91,7 @@ def mark_items_irrelevant(content_ids: list):
 
 def delete_old_irrelevant_records(days: int = 2) -> int:
     """Delete non-relevant records older than `days` days. Returns number of deleted rows."""
-    cutoff = (datetime.utcnow() - timedelta(days=days)).isoformat()
+    cutoff = (datetime.now(BRT) - timedelta(days=days)).isoformat()
     result = (
         supabase.table(TABLE)
         .delete()
