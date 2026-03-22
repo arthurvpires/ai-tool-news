@@ -118,22 +118,26 @@ digest_summary:
 
     Rules:
     - Use a numbered format (1., 2., 3. ...).
-    - Each item should have the company/product name in bold, followed by a dash, and then a detailed summary. Instead of just a single line, provide a comprehensive but clear paragraph explaining what was launched and its specific capabilities.
-    - If the input item has a media tag at the end (e.g. 🎥, 📷 or 🔗), copy it VERBATIM to the end of that item's summary. Do not modify or omit it.
+    - Each item should have the company/product name in bold, followed by a dash.
+    - Write a DIRECT, CONCISE summary without fluff or generic filler (e.g. avoid phrases like "This feature aims to simplify workflows", "Users can try this update today", "This is a notable product feature").
+    - Break down longer explanations into short, easily readable paragraphs (1-2 sentences per paragraph max). Be straight to the point about what was launched and what it does.
+    - If the input item has a media tag at the end (e.g. 🎥, 📷 or 🔗), copy it VERBATIM to the end of that item's last paragraph. Do not modify or omit it.
     - Do not include redundant items.
     - Order from most to least important (highest score first).
     - Start with the header below using the provided date/time.
     - ALWAYS leave an empty line between the header and the first item, and an empty line between every news item.
     - Do NOT include a closing sentence, quote, or commentary in the end.
-
+    
     Expected format:
     📢 *AI News — [DATE TIME]*
-
-    1. *[Company/Product]* — [Detailed and informative summary explaining what was launched, its key features, and what the product does] [🎥 See video on X](url)
-
-    2. *[Company/Product]* — [Detailed and informative summary explaining what was launched, its key features, and what the product does] [📷 See photo on X](url)
-
-    3. *[Company/Product]* — [Detailed and informative summary explaining what was launched, its key features, and what the product does] [See on X](url)
+    
+    1. *[Company/Product]* — [Direct explanation of what was launched and its core capability.]
+    
+    [Optional second short paragraph for extra details if necessary.] [🎥 See video on X](url)
+    
+    2. *[Company/Product]* — [Direct explanation of what was launched and its core capability.] [📷 See photo on X](url)
+    
+    3. *[Company/Product]* — [Direct explanation of what was launched and its core capability.] [See on X](url)
     ...
-
+    
     Return only the text above. No extra markdown, no explanations, no closing sentence.

@@ -137,6 +137,8 @@ class AIAnalyzer:
             summary = item.get("analysis_summary") or item.get("text", "")[:150]
             score = item.get("relevance_score", 0)
             url = item.get("url", "")
+            if url and not url.startswith("http"):
+                url = f"https://{url}"
 
             # Build media indicator tag
             has_video = bool(item.get("video"))
